@@ -1,0 +1,20 @@
+# Cable C1: Tap board ribbon (Samtec FFSD, mates FTSH-108 on Tap PCB) -> M12 17-pin female
+# Source: customer pin table, 2026-10-01. Straight-through 1:1, M12 pin 17 not connected.
+# Endpoint syntax: <connector>.<pin>. Every endpoint not listed must be isolated.
+net,signal,endpoints
+N01,GND,FFSD.1 M12F.1
+N02,GND,FFSD.2 M12F.2
+N03,VIN,FFSD.3 M12F.3
+N04,VIN,FFSD.4 M12F.4
+N05,GND,FFSD.5 M12F.5
+N06,GND,FFSD.6 M12F.6
+N07,RS422_B,FFSD.7 M12F.7
+N08,RS422_A,FFSD.8 M12F.8
+N09,RS422_Y,FFSD.9 M12F.9
+N10,RS422_Z,FFSD.10 M12F.10
+N11,GND,FFSD.11 M12F.11
+N12,GND,FFSD.12 M12F.12
+N13,US_RSTn_OUT,FFSD.13 M12F.13
+N14,BUTTON_OUT,FFSD.14 M12F.14
+N15,CONNECTED,FFSD.15 M12F.15
+N16,GND,FFSD.16 M12F.16

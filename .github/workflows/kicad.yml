@@ -1,0 +1,38 @@
+name: KiCad checks
+
+on:
+  pull_request:
+    paths:
+      - "hardware/**"
+      - "scripts/kicad_*.sh"
+      - ".github/workflows/kicad.yml"
+  push:
+    tags:
+      - "hw/*"
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    container:
+      image: kicad/kicad:10.0.6
+      options: --user root
+    env:
+      HOME: /root
+    steps:
+      - uses: actions/checkout@v4
+      - name: ERC / DRC
+        run: scripts/kicad_check.sh build/checks
+      - name: Review outputs (schematic PDF, BOM)
+        if: always()
+        run: scripts/kicad_outputs.sh build/outputs
+      - name: Fabrication outputs (tags only)
+        if: startsWith(github.ref, 'refs/tags/hw/')
+        run: |
+          apt-get update -qq && apt-get install -y -qq zip >/dev/null
+          scripts/kicad_outputs.sh build/outputs --fab
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: kicad-${{ github.sha }}
+          path: build/

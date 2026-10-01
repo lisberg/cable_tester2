@@ -110,6 +110,8 @@ repeat count:
     u16 tester_channel   // channel relative to this adapter's primary bank connector:
                          //   bits 0..7  = channel 0..55 within a bank side
                          //   bits 8..10 = bank offset from primary bank (0..3)
+                         //   bit  11    = 1 → other side of the bank (single-ended fixtures that
+                         //                    span both side connectors of a bank)
                          //   bit  15    = 1 → shell/chassis contact
 ```
 
@@ -184,7 +186,7 @@ the step sets `continue_on_fail`.
 | 0x13 | `NET_ONLY` | `u16 net_index…` | Restrict following checks to listed nets (staged tests) |
 | 0x20 | `LOAD_SIG` | `u16 net_index, u16 lo, u16 hi` | Analog load‑signature limit for one net (resistive leak/short) |
 | 0x21 | `RESISTOR` | `u16 net_index` | Verify a `kind==3` net within tolerance (only coarse, ≥ ~1 kΩ … ~100 kΩ) |
-| 0x22 | `DIODE` | `u16 anode_pin, u16 cathode_pin` | Conducts in one polarity only. Feasibility depends on F3 margins; verify on Proto16. |
+| 0x22 | `DIODE` | `u16 anode_pin, u16 cathode_pin` | Conducts in one polarity only. Feasibility depends on F3 margins; verify on Proto40. |
 | 0x30 | `PROMPT` | `u16 str_index, u8 wait` | Show operator message; wait = 0 none, 1 button, 2 presence change |
 | 0x31 | `WIGGLE` | `u16 seconds` | Continuous scan while operator flexes the cable; latch any change = intermittent |
 | 0x32 | `DELAY` | `u16 ms` | |
@@ -248,4 +250,4 @@ on Start:
 * Confirm a 32 kB / 64 kB part with factory unique serial and partial‑array write protect, or accept
   whole‑chip WP and keep the usage log in controller flash.
 * Profile selection UI when an adapter carries several profiles (button cycling vs. small display).
-* Exact units for `LOAD_SIG` / `leak_limit` depend on the Proto16 analog characterisation.
+* Exact units for `LOAD_SIG` / `leak_limit` depend on the Proto40 analog characterisation.

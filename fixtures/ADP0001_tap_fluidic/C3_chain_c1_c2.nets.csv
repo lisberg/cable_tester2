@@ -1,0 +1,15 @@
+# Profile C3: C1 and C2 mated at the M12 coupling (FFSD end -> Pico-SPOX end), both ends on side A.
+# Derived from C1 + C2. M12 pins are not accessible in this configuration.
+net,signal,endpoints
+N01,VIN/12V,FFSD.3 FFSD.4 PS.1
+N02,GND,FFSD.1 FFSD.2 PS.2
+N03,RS422_A->Y,FFSD.8 PS.3
+N04,RS422_B->Z,FFSD.7 PS.4
+N05,GND,FFSD.5 FFSD.6 PS.5
+N06,RS422_Z->B,FFSD.10 PS.6
+N07,RS422_Y->A,FFSD.9 PS.7
+N08,GND,FFSD.11 PS.8
+N09,US_RSTn_OUT->RES_INPUT,FFSD.13 PS.9
+N10,BUTTON,FFSD.14 PS.10
+N11,GND,FFSD.12 FFSD.16 PS.11
+N12,CONNECTED,FFSD.15 PS.12

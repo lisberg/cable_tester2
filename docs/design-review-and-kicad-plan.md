@@ -17,7 +17,7 @@ This document has two parts:
 
 The overall architecture is sound and well suited to production continuity testing: one active
 stimulus point, everything else sensed in parallel, bitmaps compared against a netlist‑derived
-expectation. The bank/adapter partitioning and the staged prototype plan (16 → 50 → 200) are
+expectation. The bank/adapter partitioning and the staged prototype plan (small proto → 50 → 200) are
 exactly right.
 
 There are, however, a few **architectural inconsistencies and missing numbers** that must be resolved
@@ -68,26 +68,36 @@ V_off = I_leak(total, per node) · Rbias              must be ≤ VIL(min) − m
 τ     = Rbias · (C_cable + C_mux + C_in + C_TVS)     sets settle time when a node is released
 ```
 
-Starting point (3.3 V domain, CMOS VIH = 0.7·VDD = 2.31 V):
+**Values for the chosen 5 V domain and ±24 V fault rating (D3, D5 – decided):**
+
+The ±24 V rating dominates. Rs must limit fault current and dissipation, so it is much larger than the
+original 330 R–1 k range. That raises the source impedance, so Rbias must rise with it. Leakage sets
+the upper limit on Rbias.
 
 | Parameter | Value | Result |
 |---|---|---|
-| Rs (per node) | 1 kΩ | limits injection, ESD energy after TVS |
-| Rlim (stimulus) | 150 Ω | short‑circuit current ≈ 3.3 V / 1.15 kΩ ≈ 2.9 mA |
-| Rbias | 220 kΩ | V_net ≥ 2.31 V for **N ≤ ~80** nodes per net |
-| Leakage budget | ≤ 1 µA/node (TVS + mux off + input) | V_off ≤ 0.22 V |
-| C per node (5 m cable ≈ 500 pF + ~50 pF parasitic) | ~550 pF | τ ≈ 120 µs |
+| VDD5 | 4.4–5.25 V (USB VBUS, filtered) | All thresholds ratiometric. ADC measures VDD5. |
+| Thresholds (74HC at 5 V) | VIH(max) = 0.7·VDD, VIL(min) = 0.3·VDD | Typical switching point ≈ 0.5·VDD |
+| Rs (per node) | **4.7 kΩ, 1206 (≥ 0.25 W)** | At ±24 V fault: ≈ 4 mA, ≈ 0.12 W per node |
+| Rlim (stimulus) | 150 Ω | Short‑circuit drive current ≈ 1 mA |
+| Rsrc total | ≈ 4.9 kΩ | Rlim + 2 × Ron + Rs |
+| Rbias | **470 kΩ** | V_net ≥ 0.75·VDD (VIH + 5 % margin) for **N ≤ 32** nodes worst case (≈ 90 typical) |
+| Leakage budget | ≤ 2 µA/node (TVS + clamp diodes + mux off + 165 input), worst case | V_off ≤ 0.94 V < 0.3·VDD = 1.32 V |
+| C per node (5 m cable ≈ 500 pF + ~50 pF) | ~550 pF | τ_release ≈ 260 µs → active discharge mandatory |
 
 Action items:
 
-* Make the **max net size** a written spec (e.g. 80 nodes). Firmware can flag profiles exceeding it.
-* Choose **low‑leakage** TVS arrays — some generic TVS parts are µA‑class at temperature, which
-  directly eats the low‑level margin.
-* Use **active discharge** instead of waiting 5τ: after each step drive the previous source to the
-  opposite polarity for ~10–20 µs before deselecting. That discharges the entire net through the
-  low‑impedance path and brings per‑step settle to ≈ 50–100 µs.
+* Write down **guaranteed max net size = 32 nodes** (worst‑case datasheet limits, all tolerances).
+  Firmware warns when a profile has a larger net. Such nets are still testable; they rely on typical
+  thresholds plus the ADC load signature (F4). Proto characterises the real limit.
+* Choose **low‑leakage** protection parts: 28–33 V bidirectional TVS with ≤ 1 µA leakage at temperature,
+  and pA/nA‑class clamp diodes (BAV199 class). Generic TVS parts can leak µA, which directly eats the
+  low‑level margin.
+* Use **active discharge** instead of waiting 5τ. After each step, drive the previous source to the
+  opposite polarity for ~20 µs before deselecting. That discharges the whole net through ~4.9 kΩ and
+  brings per‑step settle to ≈ 100–150 µs.
 
-Resulting scan time (400 sources × 2 polarities × ~150 µs incl. 50‑byte SPI read) ≈ **0.15 s** – fine.
+Resulting scan time (400 sources × 2 polarities × ~220 µs incl. 50‑byte SPI read) ≈ **0.2 s**, which is fine.
 
 Simulate this in KiCad/ngspice (see Phase 2) before freezing values.
 
@@ -150,36 +160,65 @@ Per bank card: 2 × 595 (+ optionally one more for LEDs/status/BIAS_OE). Total s
 The inactive first‑stage muxes still connect one pin each to a floating output stub — harmless
 (adds a few pF), but note it in the leakage budget.
 
-#### F8 – Logic family / voltage domain
+#### F8 – Logic family / voltage domain *(decided: 5 V analog/logic domain, D3)*
 
-* Single **3.3 V** domain for Rev A is recommended: MCU, muxes, shift registers, stimulus all at 3.3 V.
-  No level shifting, ADC full scale = logic swing.
-* 74HC parts are characterised at 2/4.5/6 V; at 3.3 V their thresholds are interpolated and timing is
-  slow. Prefer **74LV165A / 74LV595A** or **74AHC** equivalents, or verify 74HC datasheet numbers at 3.3 V.
-* The spec mentions "Schmitt" inputs; the 165 is not Schmitt. This is acceptable because sampling is
-  static (after settle). Mitigate noise in firmware: sample each frame 2–3× and require agreement.
-  Use the Rs + input capacitance as a natural low‑pass; leave a DNP cap footprint per node only on proto 1.
-* A 5 V stimulus domain (better noise margin on long cables) is a possible Rev B option; it would require
-  level translation to the MCU and 5 V‑rated muxes.
+* **5 V domain (VDD5):** muxes (TMUX1308 runs 1.62–5.5 V), '165 and '595 sense/control logic, bias rail
+  drivers, `STIM` driver. 74HC at 5 V is inside its characterised range, with better noise margin on long
+  cables than 3.3 V.
+* **3.3 V domain:** STM32C071 only (plus USB). Level interfaces:
+  * MCU → 5 V logic: **74HCT/AHCT** buffers (TTL thresholds accept 3.3 V levels). One single‑gate buffer
+    per control net on each bank card. This also gives the clean per‑card clock buffering of F10.
+  * 5 V logic → MCU (`MISO` chain end): a 74LVC1G125 powered from 3.3 V (5 V‑tolerant input), or a
+    5 V‑tolerant (FT) MCU pin. The LVC buffer is preferred because it does not depend on the pin type.
+  * `STIM` driver: 74AHCT1G125 (3‑state, 5 V output, 3.3 V‑compatible inputs) → Rlim → `STIM`.
+    `STIM` ADC tap through a 2:1 divider + RC into an MCU ADC pin. A second ADC channel measures VDD5
+    for ratiometric scaling.
+* VDD5 comes from USB VBUS through a load switch with reverse‑current blocking, an LC filter and the
+  rail shunt clamp (F9). The 3.3 V LDO for the MCU is fed from VBUS.
+* The 165 is not Schmitt. This is acceptable because sampling is static (after settle). Firmware samples
+  each frame 2–3× and requires agreement. Rs (4.7 kΩ) and the input capacitance form a natural low‑pass.
+  The prototype gets a DNP cap footprint per node.
 
-#### F9 – Protection: define what the tester survives
+#### F9 – Protection *(decided: ±24 V DC on any node, D5)*
 
-"Protection at every node" needs a number. Proposed written rating:
+Written rating:
 
-* ESD: IEC 61000‑4‑2 ±8 kV contact on every fixture node (TVS array at connector, Rs behind it).
-* DC fault: survive ±12 V indefinitely on any single node, power on or off. With Rs = 1 kΩ, the injected
-  current into the 3.3 V clamps would be ≈ 8.7 mA — check against the mux injection‑current spec and
-  the shift‑register abs‑max (typ. ±20 mA). If insufficient, raise Rs on the sense path only or add
-  per‑node clamp diodes to a rail that can absorb current (and verify the 3.3 V rail can't be pumped up —
-  add a rail clamp/zener).
-* Not rated for mains or live equipment; the ADC pre‑check (F4) refuses to test energised harnesses.
+* **ESD:** IEC 61000‑4‑2 ±8 kV contact on every fixture node.
+* **DC fault:** survive **±24 V** continuously on any fixture node, powered or unpowered, with up to
+  8 nodes per bank side faulted at once. Design margin to 30 V, so 24 V systems at full charge voltage (≈ 28.8 V) are covered. Not rated for mains or for load‑dump transients. The ADC pre‑check (F4) refuses to drive an
+  energised harness.
+
+Per‑node protection chain (connector → logic):
+
+```
+EXT ──┬── TVS (bidirectional, standoff ≥ 28 V, low leakage) ── GND/chassis
+      │
+      Rs 4.7 kΩ 1206
+      │
+NODE ─┼── clamp diode to VDD5 ┐  BAV199‑class (low leakage), two nodes per package
+      ├── clamp diode to GND  ┘
+      ├── Rbias 470 kΩ → BIAS_RAIL
+      ├── mux input
+      └── 165 input
+```
+
+* At +24 V: (24 − 5.6) / 4.7 k ≈ 3.9 mA into the VDD5 clamp per node. At −24 V: ≈ 5.2 mA out of GND.
+  Rs dissipation ≤ 0.13 W, so use 1206 (0.25 W, JLCPCB basic part).
+* External clamp diodes keep the injected current out of the mux/165 ESD structures (they would
+  otherwise see VDD + 0.6 V).
+* **Rail pumping:** 8 faulted nodes × 3.9 mA ≈ 31 mA per side, up to ~250 mA for a whole system,
+  flowing *into* VDD5. VBUS cannot sink current, so VDD5 needs an **active shunt clamp** (TLV431 + pass
+  transistor, set ≈ 5.45 V, rated ≥ 300 mA). The VBUS load switch must block reverse current so the host
+  is never back‑fed. The TMUX1308 abs‑max is around 6 V, so the clamp must hold below it — verify
+  against the datasheet in Phase 2.
+* The TVS standoff must be above the fault voltage. A 5 V TVS would conduct at 24 V and burn out.
 
 #### F10 – Interconnect between controller and banks
 
 Separate boards with ribbon cables carrying SPI clocks work but are the most common source of
 bring‑up pain. Recommend a **backplane** (controller + 4 bank slots) with:
 
-* `SCK`, `MOSI`, `RCLK` (595 latch), `SENSE_PL` (165 load), `/OE`, `STIM`, I²C (fixture ID), 3V3, GND.
+* `SCK`, `MOSI`, `RCLK` (595 latch), `SENSE_PL` (165 load), `/OE`, `STIM`, I²C (fixture ID), VDD5, 3V3, GND.
 * Sense data as a **daisy chain through all cards** (`MISO_IN` → card → `MISO_OUT`); the 165 output is
   not tri‑state so parallel MISO would need per‑card buffers.
 * Per‑card clock buffer (single‑gate Schmitt buffer) + series termination; keep SCK ≤ 4 MHz on Rev A.
@@ -241,17 +280,22 @@ Rough per‑bank‑card active BOM: 16 × TMUX1308, 14 × '165, 2 × '595, 2 × 
 
 | # | Decision | Recommendation |
 |---|---|---|
-| D1 | Symmetric channel cells (F1) | **Yes** |
-| D2 | Nodes per side: 50 (+6 internal) or 64 | 50 + 6 internal, unless connector favours 64 |
-| D3 | Voltage domain | 3.3 V single domain |
-| D4 | Max net size / Rbias / Rs | 80 nodes, 220 kΩ, 1 kΩ — confirm by simulation |
-| D5 | DC fault rating | ±12 V single node, not live equipment |
-| D6 | Controller ↔ bank interconnect | Backplane |
-| D7 | Fixture connector family | DIN 41612 64/96‑pin (evaluate pogo alternative) |
-| D8 | PCB fab target & stack‑up | 4‑layer, standard 0.127/0.127 mm class (bank card possibly 6‑layer) |
-| D9 | KiCad version | Pin one version for all contributors (9.0.x minimum, multichannel tools required) |
+Status as of 2026‑10‑01 (see `docs/decisions.md` for the log):
 
-| D10 | Adapter EEPROM scope | Identity **+ embedded test profile** (§1.5): 32 kB minimum, 64 kB‑compatible footprint |
+| # | Decision | Status |
+|---|---|---|
+| D1 | Symmetric channel cells (F1) | ✅ **Decided: yes** |
+| D2 | Nodes per side: 50 (+6 internal) or 64 | Open — needed for bank card (Phase 4) |
+| D3 | Voltage domain | ✅ **Decided: 5 V analog/logic, 3.3 V MCU** (F8) |
+| D4 | Max net size / Rbias / Rs | Proposed: 32 nodes guaranteed, 470 kΩ, 4.7 kΩ — confirm by simulation (Phase 2) |
+| D5 | DC fault rating | ✅ **Decided: ±24 V on any node** (F9) |
+| D6 | Controller ↔ bank interconnect | Proposed: backplane |
+| D7 | Fixture connector family | Proposed: DIN 41612 — needed before the adapter PCB |
+| D8 | PCB fab target & stack‑up | ✅ **Decided: JLCPCB** (JLC04161H‑7628 4‑layer, JLCPCB capabilities in DRC) |
+| D9 | KiCad version | ✅ **Decided: KiCad 10.0 (CI pinned to 10.0.6)**; checks run on pull requests |
+
+| D10 | Adapter EEPROM scope | ✅ **Decided: identity + embedded test profile** (§1.5) |
+| D11 | Prototype size | Proposed: **Proto40** (5 groups per side), so the first adapter (ADP‑0001, up to 36 nodes per side) runs on it |
 
 ### 1.5 Adapter EEPROM carrying the test sequence (standalone operation)
 
@@ -289,27 +333,27 @@ Hardware consequences (carried into Part 2):
 
 ```
 cable_tester2/
-├── docs/                         design notes, ADRs, this plan, calculations
-│   └── adr/                      one file per decision D1..D10
-├── hardware/
+├── docs/                         design notes, decision log (decisions.md), this plan, formats
+├── hardware/                     every KiCad project sits one level below hardware/ (lib path rule)
 │   ├── lib/
-│   │   ├── cable_tester.kicad_sym        project symbols (incl. MPN/manufacturer fields)
+│   │   ├── cable_tester.kicad_sym        project symbols (incl. MPN/manufacturer/LCSC fields)
 │   │   ├── cable_tester.pretty/          project footprints
-│   │   ├── 3dmodels/                     STEP models (referenced via ${CT_3DMODELS})
+│   │   ├── 3dmodels/                     STEP models (${KIPRJMOD}/../lib/3dmodels/...)
 │   │   └── design_blocks/                reusable schematic blocks (channel cell, group‑of‑8)
-│   ├── templates/
-│   │   └── ct_template/                  board setup, text vars, net classes, title block, .kicad_dru
-│   ├── sim/                              ngspice channel‑cell + cable simulation (KiCad schematic)
-│   ├── proto16/                          Prototype 1 – single board, MCU + 16 symmetric nodes
+│   ├── _template/                ✅ JLCPCB 4‑layer stack‑up, rules, net classes, .kicad_dru, title block
+│   ├── sim/                              ngspice channel‑cell + cable simulation
+│   ├── proto40/                  ✅ (empty) Prototype 1 – MCU + 40 + 40 symmetric nodes
 │   ├── controller/                       Controller board (Rev A)
 │   ├── bank50/                           50‑channel bank card (Rev A)
 │   ├── backplane/                        4‑slot backplane
-│   └── adapters/
-│       ├── _template/                    adapter template (connector footprint, ID EEPROM, outline)
-│       └── <cable_family>/               one project per adapter
+│   ├── adp_template/                     adapter template (fixture connector, EEPROM, outline)
+│   └── adp0001_a/, adp0001_b/            first adapter pair (after D7)
+├── fixtures/
+│   └── ADP0001_tap_fluidic/      ✅ cable netlists (C1, C2, chain C3), adapter pin map, open questions
+├── scripts/                      ✅ kicad_check.sh, kicad_outputs.sh, new_board.sh
 ├── firmware/                             (later)
-├── host/                                 (later – GUI, netlist → profile converter)
-└── .github/workflows/kicad.yml           ERC/DRC + fab outputs via KiBot
+├── host/                                 (later – GUI, netlist → profile/EEPROM image)
+└── .github/workflows/kicad.yml   ✅ ERC/DRC on pull requests, fab outputs on hw/* tags
 ```
 
 Conventions:
@@ -318,9 +362,9 @@ Conventions:
   resolves libraries identically on every machine. No dependence on personal global libraries.
 * Standard KiCad libraries are allowed for generic parts (R/C, 74xx, DIN 41612, USB‑C,
   STM32C0 symbols if present in the pinned version); anything custom goes into `cable_tester.*`.
-* Mandatory symbol fields: `MPN`, `Manufacturer`, `Supplier_PN`, `Value`, `Footprint`, `Datasheet`.
+* Mandatory symbol fields: `MPN`, `Manufacturer`, `LCSC` (JLCPCB assembly), `Value`, `Footprint`, `Datasheet`.
   Alternates in `MPN_Alt`.
-* Git: commit `.kicad_pro`, `.kicad_sch`, `.kicad_pcb`, `.kicad_prl` excluded, `fp-info-cache` and
+* Git: commit `.kicad_pro`, `.kicad_sch`, `.kicad_pcb`, `.kicad_dru`, lib tables; `.kicad_prl` excluded, `fp-info-cache` and
   `*-backups/` ignored. Add `.gitattributes` to treat KiCad files as text with LF.
 
 ### 2.2 Schematic hierarchy (bank card)
@@ -349,7 +393,7 @@ Notes:
   hierarchical pins (forces explicit, reviewable connectivity).
 * Annotation: "sheet number × 1000" scheme so references encode location
   (e.g. `R2317` = sheet 2, group 3, channel‑ish), which makes rework on a 100‑node board tractable.
-* The `proto16` project reuses `group8`/`channel` (2 groups per side). Share them as **KiCad design
+* The `proto40` project reuses `group8`/`channel` (5 groups per side). Share them as **KiCad design
   blocks** stored in `hardware/lib/design_blocks/` rather than referencing the same `.kicad_sch` file
   from two projects (instance data and annotation make cross‑project sheet sharing fragile).
 
@@ -390,12 +434,13 @@ The host tool converts it into the EEPROM `PINMAP` and, together with the cable 
 
 ### 2.4 Tooling & CI
 
-* **KiBot** in GitHub Actions (official KiCad Docker image matching the pinned version):
-  * on every push/PR: ERC + DRC (fail build on errors), schematic PDF, interactive BOM.
-  * on tag `hw/<board>/vX.Y`: Gerbers + drill, pick‑and‑place, BOM (CSV with MPNs), STEP, fab
-    drawing, zipped release artifact.
-* Text variables in the template (`${REVISION}`, `${BOARD}`, `${DATE}`) populated from git tag by KiBot,
-  printed on title block and silkscreen.
+* **kicad‑cli in GitHub Actions** (`kicad/kicad:10.0.6` container). There is no KiBot dependency; the
+  same scripts run locally:
+  * on every pull request: `scripts/kicad_check.sh` (ERC + DRC with schematic parity; fails on errors)
+    and `scripts/kicad_outputs.sh` (schematic PDF, BOM CSV with MPN/LCSC), uploaded as artifacts.
+  * on tag `hw/<board>/vX.Y`: plus Gerbers, drill, pick‑and‑place, STEP, zipped.
+* Text variables in the template (`BOARD_NAME`, `REVISION`, `RELEASE_DATE`, `COMPANY`, `PROJECT`) feed the
+  title block. A release can override them with `kicad-cli … -D REVISION=…`.
 * Optional: `kicad-cli` scripted netlist export of each adapter → host‑side expected‑matrix generator,
   checked in CI (adapter netlist and profile must agree).
 
@@ -404,9 +449,9 @@ The host tool converts it into the EEPROM `PINMAP` and, together with the cable 
 | Phase | Content | Deliverables | Exit criteria |
 |---|---|---|---|
 | **0 – Spec freeze** | Resolve D1–D10; freeze EEPROM format v1 header/PINMAP; write ADRs; fixture connector + mechanical concept sketch; power and timing budget | `docs/adr/*`, updated block diagram, budget spreadsheet | Decisions signed off |
-| **1 – Infrastructure** | Repo layout, KiCad template (stack‑up, net classes, `.kicad_dru`, title block), lib tables, CI with KiBot on an empty project | Green CI on template | Any contributor clones and opens every project without missing libs |
+| **1 – Infrastructure** ✅ | Repo layout, KiCad template (stack‑up, net classes, `.kicad_dru`, title block), lib tables, CI (kicad‑cli) on an empty project | Green CI on template | Any contributor clones and opens every project without missing libs |
 | **2 – Library & simulation** | Symbols/footprints for STM32C071, TMUX1308, '165/'595 (LV/AHC), TVS arrays, DIN 41612, USB‑C, EEPROM; 3D models. ngspice sim of channel cell + 5 m cable + worst‑case net | Library with MPNs; `hardware/sim` results in `docs/` | Margins in F3 confirmed incl. tolerances & leakage at temperature |
-| **3 – Proto16** | Single 4‑layer board: controller section + 2 groups per side (16+16 symmetric nodes) + 2 small fixture connectors (with ID_SDA/SCL/WP/PRESENT pins) + all internal test nodes + a mini test adapter carrying the profile EEPROM. Generous test points, 0603 parts, DNP cap per node, jumper‑selectable Rbias/Rs options | Fabricated proto, bring‑up firmware (chains, mux, STIM, ADC, USB CDC, EEPROM profile read) | No ghost hits; open/short/swap/resistive‑short detection demonstrated; leakage & settle measured vs. sim |
+| **3 – Proto40** | Single 4‑layer board: controller section + 5 groups per side (40+40 symmetric nodes) + 2 small fixture connectors (with ID_SDA/SCL/WP/PRESENT pins) + all internal test nodes + a mini test adapter carrying the profile EEPROM. Generous test points, 0603 parts, DNP cap per node, jumper‑selectable Rbias/Rs options | Fabricated proto, bring‑up firmware (chains, mux, STIM, ADC, USB CDC, EEPROM profile read) | No ghost hits; open/short/swap/resistive‑short detection demonstrated; leakage & settle measured vs. sim |
 | **4 – Rev A boards** | Bank card (hierarchy as in 2.2, multichannel layout reuse), controller, backplane — schematics → review → layout → review | Fab packages for 3 boards | Design reviews passed (checklist below), CI green |
 | **5 – Adapters** | Adapter template + first real cable family adapter pair; host tool `ctfx build/verify/program` | Adapter fab package + EEPROM image generated from netlists | Image auto‑generated and CI‑verified against adapter netlist; standalone test (no PC) passes/fails seeded faults |
 | **6 – Integration** | 1 bank → 4 banks; self‑test, adapter ID, logging, enclosure & fixture mechanics | System test report | Full 200‑pin cable tested < 1 s, self‑test catches seeded faults |
@@ -434,7 +479,7 @@ Layout review:
 
 ### 2.7 Immediate next steps
 
-1. Confirm/adjust decisions D1–D10 (especially symmetric cells and 50 vs 64 nodes per side).
-2. Set up Phase 1 infrastructure in this repo (template, lib tables, KiBot CI).
+1. Remaining open decisions: D2 (50 vs 64 per side), D6, D7 (fixture connector), D11 (Proto40).
+2. ~~Set up Phase 1 infrastructure~~ (done: template, lib tables, CI on pull requests).
 3. Build the ngspice channel‑cell model and lock Rs/Rbias/Rlim.
-4. Start Proto16 schematic using the `channel` / `group8` blocks that will carry straight into the bank card.
+4. Start Proto40 schematic using the `channel` / `group8` blocks that will carry straight into the bank card.

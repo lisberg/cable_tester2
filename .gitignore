@@ -1,0 +1,10 @@
+# KiCad
+*.kicad_prl
+*-backups/
+fp-info-cache
+_autosave-*
+*.lck
+\#auto_saved_files\#
+~*.lck
+# Outputs (produced by CI)
+build/
