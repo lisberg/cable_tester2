@@ -193,10 +193,10 @@ bring‑up pain. Recommend a **backplane** (controller + 4 bank slots) with:
   classes; it also exists in the KiCad standard library. Alternatives: high‑cycle pogo/mezzanine — decide in Phase 0.
 * One adapter spanning 4 bank connectors means 4 × 64 contacts → mating force in the 150–250 N range.
   Plan for guide pins and a lever/cam; don't let operators push boards by hand.
-* Adapter ID: one I²C EEPROM per adapter (e.g. a 24xx02 with factory unique ID). Two adapters on one bus
-  need different addresses, so either strap the address pins via the base connector (A side = 0b000,
-  B side = 0b001) or give each side its own I²C bus. Add a **presence‑detect** pin (shortest contact if
-  the connector allows staggered pins).
+* Adapter ID: one I²C EEPROM per adapter. Two adapters on one bus need different addresses, so strap
+  the address pins via the base connector (A side = 0b000, B side = 0b001) or give each side its own
+  I²C bus. Add a **presence‑detect** pin (shortest contact if the connector allows staggered pins).
+  The EEPROM is sized to also carry the **test profile/sequence** (32 kB+, see §1.5).
 
 #### F12 – Smaller items
 
@@ -251,6 +251,36 @@ Rough per‑bank‑card active BOM: 16 × TMUX1308, 14 × '165, 2 × '595, 2 × 
 | D8 | PCB fab target & stack‑up | 4‑layer, standard 0.127/0.127 mm class (bank card possibly 6‑layer) |
 | D9 | KiCad version | Pin one version for all contributors (9.0.x minimum, multichannel tools required) |
 
+| D10 | Adapter EEPROM scope | Identity **+ embedded test profile** (§1.5): 32 kB minimum, 64 kB‑compatible footprint |
+
+### 1.5 Adapter EEPROM carrying the test sequence (standalone operation)
+
+The adapter EEPROM can hold more than an ID. It can carry the complete test definition, so a matching
+adapter pair plus the *Start* button is enough to test a cable **without a PC**. The full format is in
+[`adapter-eeprom-format.md`](adapter-eeprom-format.md). Key points:
+
+* **Store the intent, not the scan.** The EEPROM holds the expected netlist (in adapter‑pin terms) plus
+  a short list of sequence opcodes (`PRECHECK`, `SELFTEST`, `CONTINUITY`, `LOAD_SIG`, `PROMPT`,
+  `WIGGLE`, …). The controller derives expected bitmaps at run time. A 200‑wire cable profile is
+  ≈ 4 kB including pin labels; raw bitmaps would be ≥ 20 kB per polarity.
+* **Separation of concerns.** Each adapter stores its own *pin → tester channel* map (generated from
+  its KiCad netlist). The *primary* adapter stores the cable profile and the required partner adapter
+  type. The same profile works on side A or B and in any bank position.
+* **Safety stays in firmware.** The voltage `PRECHECK` always runs, whatever the profile says.
+* **PC overrides.** When the host is connected and has loaded a profile, the EEPROM is used for identity
+  only. The host tool is the only writer: it programs through the tester, with `WP` controlled by the
+  controller and protected by default.
+* **Integrity.** Versioned format (major/minor), CRC‑32 per section, forward‑compatible TLV opcodes. An
+  optional HMAC signature is reserved for regulated production.
+
+Hardware consequences (carried into Part 2):
+
+| Board | Change |
+|---|---|
+| Adapter | 24xx256/512‑class EEPROM (SOIC‑8/TSSOP‑8), A0–A2 and `WP` routed to the base connector, `WP` pull‑up + "lock" solder jumper, presence pin |
+| Bank card / backplane | Per side: `ID_SDA`, `ID_SCL`, `ID_WP`, `PRESENT`, address straps. Primary bank connector only, but wired on all for flexibility |
+| Controller | `WP` control GPIOs, I²C ESD/series R. **Standalone UI:** Start button, PASS/FAIL LEDs, buzzer, optional small display (I²C OLED / character LCD) for prompts and fault text; optional SPI flash for result logs and a profile cache |
+
 ---
 
 ## Part 2 – KiCad realization plan
@@ -260,7 +290,7 @@ Rough per‑bank‑card active BOM: 16 × TMUX1308, 14 × '165, 2 × '595, 2 × 
 ```
 cable_tester2/
 ├── docs/                         design notes, ADRs, this plan, calculations
-│   └── adr/                      one file per decision D1..D9
+│   └── adr/                      one file per decision D1..D10
 ├── hardware/
 │   ├── lib/
 │   │   ├── cable_tester.kicad_sym        project symbols (incl. MPN/manufacturer fields)
@@ -344,15 +374,19 @@ Notes:
 * Test points on `STIM`, `BIAS_RAIL_A/B`, all '595 outputs, chain in/out, 3V3, GND.
 
 **Controller** — 2‑ or 4‑layer, USB‑C + ESD + polyfuse + LDO, STM32C071, SWD, `STIM` driver
-(GPIO → Rlim → STIM, ADC tap via RC + clamp), I²C for fixture IDs with pull‑ups and buffer/ESD,
-backplane connector, LEDs/button/buzzer.
+(GPIO → Rlim → STIM, ADC tap via RC + clamp), I²C for fixture EEPROMs with pull‑ups and ESD/series R,
+two `ID_WP` drive lines (default protected), presence inputs, backplane connector. Standalone UI per
+§1.5: Start button, PASS/FAIL LEDs, buzzer, header/footprint for an I²C display, optional SPI flash
+footprint (DNP) for logs.
 
 **Backplane** — 2‑layer (4 if SCK integrity demands), 5 slots, slot‑ID straps, power entry.
 
 **Adapters** — template project: board outline + mounting/guide holes matching the bank card front,
-DIN 41612 mating footprint(s), ID EEPROM with address straps, presence‑detect, shell strap, and a
-blank area for the customer connector. Adapter mapping lives in the schematic *and* is exported as a
-netlist that the host tool converts into the test profile — **one source of truth**.
+DIN 41612 mating footprint(s), profile EEPROM (24xx256/512 footprint) with A0–A2 and `WP` taken to the
+base connector, `WP` pull‑up + lock jumper, presence‑detect, shell strap, and a blank area for the
+customer connector. Adapter mapping lives in the schematic *and* is exported (`kicad-cli`) as a netlist.
+The host tool converts it into the EEPROM `PINMAP` and, together with the cable definition, into the
+`PROFILE` image — **one source of truth**.
 
 ### 2.4 Tooling & CI
 
@@ -369,12 +403,12 @@ netlist that the host tool converts into the test profile — **one source of tr
 
 | Phase | Content | Deliverables | Exit criteria |
 |---|---|---|---|
-| **0 – Spec freeze** | Resolve D1–D9; write ADRs; fixture connector + mechanical concept sketch; power and timing budget | `docs/adr/*`, updated block diagram, budget spreadsheet | Decisions signed off |
+| **0 – Spec freeze** | Resolve D1–D10; freeze EEPROM format v1 header/PINMAP; write ADRs; fixture connector + mechanical concept sketch; power and timing budget | `docs/adr/*`, updated block diagram, budget spreadsheet | Decisions signed off |
 | **1 – Infrastructure** | Repo layout, KiCad template (stack‑up, net classes, `.kicad_dru`, title block), lib tables, CI with KiBot on an empty project | Green CI on template | Any contributor clones and opens every project without missing libs |
 | **2 – Library & simulation** | Symbols/footprints for STM32C071, TMUX1308, '165/'595 (LV/AHC), TVS arrays, DIN 41612, USB‑C, EEPROM; 3D models. ngspice sim of channel cell + 5 m cable + worst‑case net | Library with MPNs; `hardware/sim` results in `docs/` | Margins in F3 confirmed incl. tolerances & leakage at temperature |
-| **3 – Proto16** | Single 4‑layer board: controller section + 2 groups per side (16+16 symmetric nodes) + 2 small fixture connectors + all internal test nodes. Generous test points, 0603 parts, DNP cap per node, jumper‑selectable Rbias/Rs options | Fabricated proto, bring‑up firmware (chains, mux, STIM, ADC, USB CDC) | No ghost hits; open/short/swap/resistive‑short detection demonstrated; leakage & settle measured vs. sim |
+| **3 – Proto16** | Single 4‑layer board: controller section + 2 groups per side (16+16 symmetric nodes) + 2 small fixture connectors (with ID_SDA/SCL/WP/PRESENT pins) + all internal test nodes + a mini test adapter carrying the profile EEPROM. Generous test points, 0603 parts, DNP cap per node, jumper‑selectable Rbias/Rs options | Fabricated proto, bring‑up firmware (chains, mux, STIM, ADC, USB CDC, EEPROM profile read) | No ghost hits; open/short/swap/resistive‑short detection demonstrated; leakage & settle measured vs. sim |
 | **4 – Rev A boards** | Bank card (hierarchy as in 2.2, multichannel layout reuse), controller, backplane — schematics → review → layout → review | Fab packages for 3 boards | Design reviews passed (checklist below), CI green |
-| **5 – Adapters** | Adapter template + first real cable family adapter pair | Adapter fab package + generated test profile | Profile auto‑generated from adapter netlist |
+| **5 – Adapters** | Adapter template + first real cable family adapter pair; host tool `ctfx build/verify/program` | Adapter fab package + EEPROM image generated from netlists | Image auto‑generated and CI‑verified against adapter netlist; standalone test (no PC) passes/fails seeded faults |
 | **6 – Integration** | 1 bank → 4 banks; self‑test, adapter ID, logging, enclosure & fixture mechanics | System test report | Full 200‑pin cable tested < 1 s, self‑test catches seeded faults |
 
 ### 2.6 Review checklists (gate for Phase 4/5)
@@ -400,7 +434,7 @@ Layout review:
 
 ### 2.7 Immediate next steps
 
-1. Confirm/adjust decisions D1–D9 (especially symmetric cells and 50 vs 64 nodes per side).
+1. Confirm/adjust decisions D1–D10 (especially symmetric cells and 50 vs 64 nodes per side).
 2. Set up Phase 1 infrastructure in this repo (template, lib tables, KiBot CI).
 3. Build the ngspice channel‑cell model and lock Rs/Rbias/Rlim.
 4. Start Proto16 schematic using the `channel` / `group8` blocks that will carry straight into the bank card.
