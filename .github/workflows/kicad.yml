@@ -31,7 +31,7 @@ jobs:
       - name: Generated schematics are up to date
         run: |
           python3 hardware/gen/make_lib.py
-          python3 hardware/gen/proto40.py
+          python3 hardware/gen/proto40.py --strict
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
           git diff --exit-code -- hardware/lib hardware/proto40 || {
             echo "::error::Generated files differ - run hardware/gen scripts and commit the result"; exit 1; }

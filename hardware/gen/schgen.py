@@ -107,17 +107,21 @@ LIB = Library()
 
 # --------------------------------------------------------------------------------------------- items
 class Sym:
-    def __init__(self, sheet, lib_id, prefix, idx, at, rot, unit, value, footprint, fields, dnp, ref_override):
+    def __init__(self, sheet, lib_id, prefix, idx, at, rot, unit, value, footprint, fields, dnp, text):
         self.sheet, self.lib = sheet, LIB.get(lib_id)
         self.prefix, self.idx, self.unit = prefix, idx, unit
         self.x, self.y, self.rot = snap(at[0]), snap(at[1]), rot
         self.value = value if value is not None else self.lib.props.get("Value", "")
         self.footprint = footprint if footprint is not None else self.lib.props.get("Footprint", "")
-        self.fields, self.dnp, self.ref_override = fields or {}, dnp, ref_override
+        self.fields, self.dnp, self.text = fields or {}, dnp, text
         self.uuid = uid(sheet.name, "sym", prefix, idx, unit)
         self.used = set()
 
-    def pin(self, key):
+    def pos(self, key):
+        x, y, _ = self.pin(key)
+        return x, y
+
+    def pin(self, key, mark=True):
         """Return (x, y, outward_angle) of a pin by number or name (first match, current unit)."""
         cands = [p for p in self.lib.pins if p.unit in (0, self.unit)]
         m = [p for p in cands if p.number == key] or [p for p in cands if p.name == key]
@@ -128,41 +132,73 @@ class Sym:
         rx = p.x * math.cos(r) - p.y * math.sin(r)
         ry = p.x * math.sin(r) + p.y * math.cos(r)
         out = (p.angle + 180 + self.rot) % 360
-        self.used.add(p.number)
+        if mark:
+            self.used.add(p.number)
         return snap(self.x + rx), snap(self.y - ry), out
 
-    def _bbox(self):
-        """Body bounding box in schematic coordinates (rectangle graphics, else pin extents)."""
-        pts = []
+    def _xf(self, px, py):
+        r = math.radians(self.rot)
+        return (self.x + px * math.cos(r) - py * math.sin(r), self.y - (px * math.sin(r) + py * math.cos(r)))
+
+    def bbox(self):
+        """Body bounding box (all graphics of this unit, pins excluded) in schematic coordinates."""
+        pts, rect = [], False
         for sub in find(self.lib.node, "symbol"):
             unit = int(sub[1].rsplit("_", 2)[-2])
             if unit not in (0, self.unit):
                 continue
-            for rect in find(sub, "rectangle"):
-                st, en = first(rect, "start"), first(rect, "end")
-                pts += [(float(st[1]), float(st[2])), (float(en[1]), float(en[2]))]
-        rect = bool(pts)
+            for g in sub[2:]:
+                if not isinstance(g, list):
+                    continue
+                if g[0] == "rectangle":
+                    rect = True
+                    for k in ("start", "end"):
+                        e = first(g, k)
+                        pts.append((float(e[1]), float(e[2])))
+                elif g[0] == "polyline":
+                    pts += [(float(xy[1]), float(xy[2])) for xy in find(first(g, "pts"), "xy")]
+                elif g[0] == "circle":
+                    c, rr = first(g, "center"), float(first(g, "radius")[1])
+                    pts += [(float(c[1]) - rr, float(c[2]) - rr), (float(c[1]) + rr, float(c[2]) + rr)]
+                elif g[0] == "arc":
+                    pts += [(float(first(g, k)[1]), float(first(g, k)[2])) for k in ("start", "mid", "end")]
         if not pts:
             pts = [(p.x, p.y) for p in self.all_pins()] or [(0, 0)]
-        r = math.radians(self.rot)
-        xs, ys = [], []
-        for px, py in pts:
-            xs.append(self.x + px * math.cos(r) - py * math.sin(r))
-            ys.append(self.y - (px * math.sin(r) + py * math.cos(r)))
+        xy = [self._xf(px, py) for px, py in pts]
+        xs, ys = [a for a, _ in xy], [b for _, b in xy]
         return min(xs), min(ys), max(xs), max(ys), rect
 
     def _text_spots(self):
+        """Reference/value positions that stay clear of the body, the pins and the wires on them."""
+        x0, y0, x1, y1, rect = self.bbox()
         if self.lib.is_power:
-            down = self.rot % 360 in (0,) and self.lib.lib_id.endswith("GND") or self.rot == 180
-            return ((self.x, self.y + 3.81, None), (self.x, self.y + (3.81 if down else -3.81), None))
-        x0, y0, x1, y1, rect = self._bbox()
-        if rect:
-            return ((x0, y0 - 1.27, "left bottom"), (x0, y1 + 1.27, "left top"))
-        if (x1 - x0) <= (y1 - y0):           # vertical two-terminal part: text to the right
-            cy = (y0 + y1) / 2
-            return ((x1 + 1.905, cy - 1.27, "left"), (x1 + 1.905, cy + 1.27, "left"))
-        cx = (x0 + x1) / 2                    # horizontal: text above / below
-        return ((cx, y0 - 2.54, None), (cx, y1 + 2.54, None))
+            # value text beyond the symbol, in the direction it points
+            base = 270 if self.lib.lib_id.endswith("GND") else 90
+            d = (base + self.rot) % 360
+            cx, cy = (x0 + x1) / 2, (y0 + y1) / 2
+            spot = {270: (cx, y1 + 0.635, "top"), 90: (cx, y0 - 0.635, "bottom"),
+                    180: (x0 - 0.635, cy, "right"), 0: (x1 + 0.635, cy, "left")}[d]
+            return (spot, spot)
+        mode = self.text
+        if mode == "auto":
+            if rect and len(self.all_pins()) > 3:
+                mode = "ic"
+            elif (x1 - x0) <= (y1 - y0) + 0.01:
+                mode = "right"
+            else:
+                mode = "above"
+        cx, cy = (x0 + x1) / 2, (y0 + y1) / 2
+        if mode == "ic":      # outside the top-left / bottom-left corners, extending away from the body
+            return ((x0, y0 - 1.27, "right bottom"), (x0, y1 + 1.27, "right top"))
+        if mode == "icright":
+            return ((x1, y0 - 1.27, "left bottom"), (x1, y1 + 1.27, "left top"))
+        if mode == "right":
+            return ((x1 + 0.762, cy - 1.27, "left"), (x1 + 0.762, cy + 1.27, "left"))
+        if mode == "left":
+            return ((x0 - 0.762, cy - 1.27, "right"), (x0 - 0.762, cy + 1.27, "right"))
+        if mode == "below":
+            return ((cx, y1 + 1.27, "top"), (cx, y1 + 3.81, "top"))
+        return ((cx, y0 - 1.27, "bottom"), (cx, y1 + 1.27, "top"))   # above / below
 
     def all_pins(self):
         return [p for p in self.lib.pins if p.unit in (0, self.unit)]
@@ -182,7 +218,14 @@ class Sym:
         for k, v in self.fields.items():
             props.append((k, v, (self.x, self.y), None, True))
         for k, v, (px, py), just, hide in props:
-            n.append(["property", Q(k), Q(v), ["at", snap(px), snap(py), 0], font(hide=hide, justify=just)])
+            # KiCad adds the symbol rotation to the field angle (store -rot for 90/270). For 180 it keeps the
+            # text upright but mirrors the justification, so mirror it back.
+            ang = (-self.rot) % 360 if self.rot in (90, 270) else 0
+            if self.rot == 180 and just:
+                swap = {"left": "right", "right": "left", "top": "bottom", "bottom": "top"}
+                just = " ".join(swap.get(w, w) for w in just.split())
+            n.append(["property", Q(k), Q(v), ["at", round(px, 3), round(py, 3), ang],
+                      font(hide=hide, justify=just)])
         for p in self.all_pins():
             n.append(["pin", Q(p.number), ["uuid", Q(uid(self.uuid, "pin", p.number))]])
         n.append(["instances", ["project", Q(self.sheet.project),
@@ -200,10 +243,12 @@ class SheetSym:
         self.pins = {}
         left = [p for p in pins if p[2] == "L"]
         right = [p for p in pins if p[2] == "R"]
-        for i, (pname, ptype, side) in enumerate(left):
-            self.pins[pname] = (self.x, snap(self.y + 2.54 * (i + 1)), 180, ptype)
+        for i, (pname, ptype, side) in enumerate(left):          # pname None = empty row
+            if pname:
+                self.pins[pname] = (self.x, snap(self.y + 2.54 * (i + 1)), 180, ptype)
         for i, (pname, ptype, side) in enumerate(right):
-            self.pins[pname] = (snap(self.x + self.w), snap(self.y + 2.54 * (i + 1)), 0, ptype)
+            if pname:
+                self.pins[pname] = (snap(self.x + self.w), snap(self.y + 2.54 * (i + 1)), 0, ptype)
 
     def pin(self, name):
         x, y, a, _ = self.pins[name]
@@ -233,18 +278,19 @@ class Sheet:
     def __init__(self, name, filename, project, title="", paper="A3"):
         self.name, self.filename, self.project, self.title, self.paper = name, filename, project, title, paper
         self.syms, self.sheets, self.items = [], [], []
+        self.segs, self.junctions = [], set()
         self.counters = {}
         self.uuid = uid(filename, "root")
 
     # -- placement
     def add(self, lib_id, prefix, at, rot=0, value=None, footprint=None, unit=1, fields=None, dnp=False,
-            same_as=None):
+            same_as=None, text="auto"):
         if same_as is not None:
             idx = same_as.idx
         else:
             idx = self.counters.get(prefix, 0) + 1
             self.counters[prefix] = idx
-        s = Sym(self, lib_id, prefix, idx, at, rot, unit, value, footprint, fields, dnp, None)
+        s = Sym(self, lib_id, prefix, idx, at, rot, unit, value, footprint, fields, dnp, text)
         self.syms.append(s)
         return s
 
@@ -278,15 +324,44 @@ class Sheet:
         self.items.append(["no_connect", ["at", x, y], ["uuid", Q(uid(self.filename, "nc", x, y))]])
 
     def wire(self, x1, y1, x2, y2):
+        x1, y1, x2, y2 = snap(x1), snap(y1), snap(x2), snap(y2)
+        if (x1, y1) == (x2, y2):
+            return
+        self.segs.append((x1, y1, x2, y2))
         self.items.append(["wire", ["pts", ["xy", x1, y1], ["xy", x2, y2]],
                            ["stroke", ["width", 0], ["type", "default"]],
                            ["uuid", Q(uid(self.filename, "w", x1, y1, x2, y2))]])
+
+    def path(self, *pts):
+        """Polyline through points; a point may be a (sym, pin) tuple. Use hv()/vh() for corners."""
+        xy = [p if isinstance(p[0], (int, float)) else p[0].pos(p[1]) for p in pts]
+        for (a, b), (c, d) in zip(xy, xy[1:]):
+            self.wire(a, b, c, d)
+        return xy[-1]
+
+    def hv(self, a, b):
+        """Orthogonal route: horizontal first, then vertical."""
+        return self.path(a, (b[0], a[1]), b)
+
+    def vh(self, a, b):
+        return self.path(a, (a[0], b[1]), b)
+
+    def stub(self, obj, pin, length=2.54):
+        """Wire out of a pin along its direction; returns the free end."""
+        x, y, a = obj.pin(pin)
+        dx = {0: length, 180: -length, 90: 0, 270: 0}[a]
+        dy = {0: 0, 180: 0, 90: -length, 270: length}[a]
+        self.wire(x, y, x + dx, y + dy)
+        return snap(x + dx), snap(y + dy)
+
+    def junction(self, x, y):
+        self.junctions.add((snap(x), snap(y)))
 
     def text(self, s, x, y, size=1.27):
         self.items.append(["text", Q(s), ["exclude_from_sim", "no"], ["at", x, y, 0],
                            font(justify="left top", size=size), ["uuid", Q(uid(self.filename, "txt", s[:40], x, y))]])
 
-    def connect(self, obj, pin, net, kind=None, shape="bidirectional", stub=2.54):
+    def connect(self, obj, pin, net, kind=None, shape="bidirectional", stub=2.54, rotate=False):
         """Attach net to a pin: power symbol for rails, no-connect for None, label otherwise.
         kind: 'local' (default), 'global', 'hier'. A short wire stub keeps labels off the symbol body."""
         x, y, a = obj.pin(pin)
@@ -294,6 +369,13 @@ class Sheet:
             self.nc(x, y)
             return
         if net in self.POWER and kind is None:
+            if a in (0, 180) and not rotate:
+                # horizontal pin: short stub, then a normally oriented symbol (GND down, rails up)
+                x, y = self.stub(obj, pin, max(stub, 2.54))
+                self.power(net, x, y, 270 if net == "GND" else 90)
+                return
+            if stub and stub > 2.54:
+                x, y = self.stub(obj, pin, stub)
             self.power(net, x, y, a)
             return
         dx = {0: stub, 180: -stub, 90: 0, 270: 0}[a]
@@ -317,6 +399,35 @@ class Sheet:
                     x, y, _ = s.pin(p.number)
                     self.nc(x, y)
 
+    def pin_points(self):
+        pts = []
+        for s in self.syms:
+            for p in s.all_pins():
+                x, y, _ = s.pin(p.number, mark=False)
+                pts.append((x, y))
+        for sh in self.sheets:
+            pts += [(x, y) for x, y, _, _ in sh.pins.values()]
+        return pts
+
+    def _auto_junctions(self):
+        """Junction wherever three or more connection ends meet, or a wire/pin ends on a wire interior."""
+        deg = {}
+        for x1, y1, x2, y2 in self.segs:
+            for pt in ((x1, y1), (x2, y2)):
+                deg[pt] = deg.get(pt, 0) + 1
+        for pt in self.pin_points():
+            deg[pt] = deg.get(pt, 0) + 1
+        out = set()
+        for (px, py), d in deg.items():
+            for x1, y1, x2, y2 in self.segs:
+                inside = (x1 == x2 == px and min(y1, y2) < py < max(y1, y2)) or \
+                         (y1 == y2 == py and min(x1, x2) < px < max(x1, x2))
+                if inside:
+                    d += 2
+            if d >= 3:
+                out.add((px, py))
+        return out
+
     # -- output
     def write(self, path, instances_of, pages_of, lib_extra=()):
         """instances_of(sheet, sym) -> [(path, ref)], pages_of(sheetsym) -> [(path, page)]."""
@@ -330,6 +441,9 @@ class Sheet:
                  ["comment", 2, Q("Generated by hardware/gen – edit the generator, not this file")]],
                 ["lib_symbols", *[libs[k] for k in sorted(libs)]]]
         root += self.items
+        for jx, jy in sorted(self._auto_junctions() | self.junctions):
+            root.append(["junction", ["at", jx, jy], ["diameter", 0], ["color", 0, 0, 0, 0],
+                         ["uuid", Q(uid(self.filename, "j", jx, jy))]])
         for s in self.syms:
             root.append(s.node(instances_of(self, s)))
         for sh in self.sheets:
