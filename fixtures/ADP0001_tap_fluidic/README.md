@@ -24,9 +24,11 @@ open). The profile EEPROM sits on **ADP0001‑A** (primary) and holds profiles 1
 * Opens, shorts, and swapped or crossed wires on every conductor, in both drive polarities.
 * The **RS‑422 crossover** in C2/C3 (Tap A/B ↔ Fluidic Y/Z) is checked explicitly: a "straight" wired
   pair fails.
-* **Separate ground wires stay separate.** C2 has four distinct GND nets (PS.2, PS.5, PS.8, PS.11).
-  A short between them inside the cable fails, because the expected netlist keeps them apart.
-  ⚠ Confirm this matches the intended design (see Q3).
+* **Ground wires are commoned in C2** (confirmed 2026‑10‑06). C2 has one GND net with 11 endpoints
+  (M12M 1, 2, 5, 6, 11, 12, 16 + PS 2, 5, 8, 11). Every one of them must be present, so a broken ground
+  wire fails. That's well within the guaranteed 32‑node net size. C1 is still modelled 1:1 with separate
+  GND conductors (see Q3b).
+* `C3` is generated with `scripts/chain_nets.py` and must be regenerated whenever C1 or C2 changes.
 * Unused M12 pin 17 is checked for isolation against everything.
 * Bridged pins (M12M.1+2, 3+4, 5+6, 12+16) must be connected to each other.
 
@@ -53,8 +55,9 @@ RESULT
 2. **Shells and shield:** are the M12 coupling nuts or shells metal, and are the cables shielded?
    If so, where does the shield/drain land? This decides whether channels B35/B36 are tested or left
    as don't‑care.
-3. **Ground wires:** should the separate GND wires stay isolated from each other inside the cable
-   (current assumption), or are they spliced somewhere?
+3. ~~Ground wires isolated?~~ **Answered 2026‑10‑06: not isolated (commoned).** Applied to C2.
+   3b. **Does the same apply to C1** (ribbon → M12 female)? Are FFSD 1, 2, 5, 6, 11, 12, 16 joined inside
+   the cable, or only on the Tap PCB? Currently modelled as separate conductors.
 4. **FTSH variant on the Tap board** (e.g. FTSH‑108‑01‑L‑DV‑K, keyed/shrouded?) and FFSD polarisation.
    The adapter must use the same header so the cable is keyed the same way.
 5. **Pico‑SPOX 0874371273:** confirm vertical vs right‑angle on the Fluidic board. The adapter copies it.
@@ -66,5 +69,6 @@ RESULT
 
 * Library: FTSH‑108 header and Pico‑SPOX 87437‑1273 footprints (12 ckt; only the 14 ckt variant is in the
   standard library), M12 17‑pin panel connectors, from vendor drawings once Q1/Q4/Q5 are answered.
-* Projects `hardware/adp0001_a` and `hardware/adp0001_b`, created with `scripts/new_board.sh` after D7
-  (fixture connector) is fixed.
+* Projects `hardware/adp0001_a` and `hardware/adp0001_b`. Each carries one DIN 41612 C 2×32 male
+  right‑angle connector to the base (`docs/fixture-interface.md`). EEPROM on ‑A only. ‑B ties `PRESENT_N`
+  to GND and leaves the ID pins open.

@@ -81,9 +81,9 @@ the upper limit on Rbias.
 | Rs (per node) | **4.7 kΩ, 1206 (≥ 0.25 W)** | At ±24 V fault: ≈ 4 mA, ≈ 0.12 W per node |
 | Rlim (stimulus) | 150 Ω | Short‑circuit drive current ≈ 1 mA |
 | Rsrc total | ≈ 4.9 kΩ | Rlim + 2 × Ron + Rs |
-| Rbias | **470 kΩ** | V_net ≥ 0.75·VDD (VIH + 5 % margin) for **N ≤ 32** nodes worst case (≈ 90 typical) |
-| Leakage budget | ≤ 2 µA/node (TVS + clamp diodes + mux off + 165 input), worst case | V_off ≤ 0.94 V < 0.3·VDD = 1.32 V |
-| C per node (5 m cable ≈ 500 pF + ~50 pF) | ~550 pF | τ_release ≈ 260 µs → active discharge mandatory |
+| Rbias | **680 kΩ** | V ≥ 0.75·VDD (VIH + 5 % margin) for **N ≤ 32** nodes worst case (≈ 64 typical), simulated |
+| Leakage budget | ≤ 1 µA/node (TVS + clamp diodes + mux off + 165 input) at ≤ 40 °C ambient | Isolated node ≤ 0.69 V < 0.3·VDD = 1.32 V |
+| C per node (5 m cable ≈ 500 pF + ~50 pF) | ~550 pF | τ_release ≈ 370 µs → active discharge mandatory |
 
 Action items:
 
@@ -95,7 +95,10 @@ Action items:
   low‑level margin.
 * Use **active discharge** instead of waiting 5τ. After each step, drive the previous source to the
   opposite polarity for ~20 µs before deselecting. That discharges the whole net through ~4.9 kΩ and
-  brings per‑step settle to ≈ 100–150 µs.
+  brings per‑step settle to ≈ 10–40 µs for typical 2–8 node nets. Big nets need longer (≈ 260 µs at 32 nodes).
+  Firmware derives the settle time per step from the expected net size.
+* **Simulated** in `hardware/sim/channel_sim.py`; results in `hardware/sim/report.md`, including the
+  Rs/Rbias/leakage sensitivity table behind these choices.
 
 Resulting scan time (400 sources × 2 polarities × ~220 µs incl. 50‑byte SPI read) ≈ **0.2 s**, which is fine.
 
@@ -197,15 +200,18 @@ EXT ──┬── TVS (bidirectional, standoff ≥ 28 V, low leakage) ── G
       │
 NODE ─┼── clamp diode to VDD5 ┐  BAV199‑class (low leakage), two nodes per package
       ├── clamp diode to GND  ┘
-      ├── Rbias 470 kΩ → BIAS_RAIL
+      ├── Rbias 680 kΩ → BIAS_RAIL
       ├── mux input
       └── 165 input
 ```
 
-* At +24 V: (24 − 5.6) / 4.7 k ≈ 3.9 mA into the VDD5 clamp per node. At −24 V: ≈ 5.2 mA out of GND.
-  Rs dissipation ≤ 0.13 W, so use 1206 (0.25 W, JLCPCB basic part).
-* External clamp diodes keep the injected current out of the mux/165 ESD structures (they would
-  otherwise see VDD + 0.6 V).
+* Simulated (`hardware/sim/report.md` §4): +24 V → 3.8 mA, −24 V → 5.0 mA; at 30 V up to 6.3 mA and
+  0.18 W in Rs. Use 1206 (0.25 W, JLCPCB basic part).
+* **Correction from simulation:** low‑leakage clamps (BAV199 class) have a *higher* Vf than the CMOS input
+  ESD diodes, so ≈ 95 % of the fault current still flows through the mux/'165 input structures. Rs is the
+  real limiter. ≤ 6.3 mA per input is inside the 74HC ±20 mA clamp‑current rating; **TMUX1308
+  injection/clamp rating must be confirmed in Phase 2**. The external clamps are kept as a footprint
+  option (DNP on Proto40) rather than relied upon.
 * **Rail pumping:** 8 faulted nodes × 3.9 mA ≈ 31 mA per side, up to ~250 mA for a whole system,
   flowing *into* VDD5. VBUS cannot sink current, so VDD5 needs an **active shunt clamp** (TLV431 + pass
   transistor, set ≈ 5.45 V, rated ≥ 300 mA). The VBUS load switch must block reverse current so the host
@@ -285,17 +291,17 @@ Status as of 2026‑10‑01 (see `docs/decisions.md` for the log):
 | # | Decision | Status |
 |---|---|---|
 | D1 | Symmetric channel cells (F1) | ✅ **Decided: yes** |
-| D2 | Nodes per side: 50 (+6 internal) or 64 | Open — needed for bank card (Phase 4) |
+| D2 | Nodes per side | ✅ **50 + shell** (set by the 64‑pin DIN connector, `docs/fixture-interface.md`) |
 | D3 | Voltage domain | ✅ **Decided: 5 V analog/logic, 3.3 V MCU** (F8) |
-| D4 | Max net size / Rbias / Rs | Proposed: 32 nodes guaranteed, 470 kΩ, 4.7 kΩ — confirm by simulation (Phase 2) |
+| D4 | Max net size / Rbias / Rs | ✅ **Simulated: 32 nodes guaranteed, Rbias 680 kΩ, Rs 4.7 kΩ, leakage ≤ 1 µA/node** |
 | D5 | DC fault rating | ✅ **Decided: ±24 V on any node** (F9) |
 | D6 | Controller ↔ bank interconnect | Proposed: backplane |
-| D7 | Fixture connector family | Proposed: DIN 41612 — needed before the adapter PCB |
+| D7 | Fixture connector family | ✅ **DIN 41612 type C 2×32** (female base, male right‑angle adapter) |
 | D8 | PCB fab target & stack‑up | ✅ **Decided: JLCPCB** (JLC04161H‑7628 4‑layer, JLCPCB capabilities in DRC) |
 | D9 | KiCad version | ✅ **Decided: KiCad 10.0 (CI pinned to 10.0.6)**; checks run on pull requests |
 
 | D10 | Adapter EEPROM scope | ✅ **Decided: identity + embedded test profile** (§1.5) |
-| D11 | Prototype size | Proposed: **Proto40** (5 groups per side), so the first adapter (ADP‑0001, up to 36 nodes per side) runs on it |
+| D11 | Prototype size | ✅ **Proto40** (5 groups per side) |
 
 ### 1.5 Adapter EEPROM carrying the test sequence (standalone operation)
 
@@ -479,7 +485,7 @@ Layout review:
 
 ### 2.7 Immediate next steps
 
-1. Remaining open decisions: D2 (50 vs 64 per side), D6, D7 (fixture connector), D11 (Proto40).
+1. Remaining open decision: D6 (backplane), needed for Phase 4 only.
 2. ~~Set up Phase 1 infrastructure~~ (done: template, lib tables, CI on pull requests).
-3. Build the ngspice channel‑cell model and lock Rs/Rbias/Rlim.
+3. ~~Build the ngspice channel‑cell model and lock Rs/Rbias/Rlim~~ (done, `hardware/sim`).
 4. Start Proto40 schematic using the `channel` / `group8` blocks that will carry straight into the bank card.
