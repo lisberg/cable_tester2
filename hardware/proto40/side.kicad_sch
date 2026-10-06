@@ -6981,13 +6981,13 @@
 	(wire
 		(pts
 			(xy 250.19 27.94)
-			(xy 270.51 27.94)
+			(xy 275.59 27.94)
 		)
 		(stroke
 			(width 0)
 			(type default)
 		)
-		(uuid "4fd278d4-5179-5ee1-9bfc-25f7d5c23b4a")
+		(uuid "f6aa3963-041a-52ee-be38-99e2bbfc5340")
 	)
 	(wire
 		(pts
@@ -9091,21 +9091,21 @@
 		(dnp no)
 		(uuid "1c77df68-2cc2-58b8-ae39-381fc4959643")
 		(property "Reference" "C1001"
-			(at 262.89 29.718 0)
+			(at 265.684 30.48 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
-				(justify bottom)
+				(justify left)
 			)
 		)
 		(property "Value" "100n"
-			(at 262.89 33.782 0)
+			(at 265.684 33.02 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
-				(justify top)
+				(justify left)
 			)
 		)
 		(property "Footprint" "Capacitor_SMD:C_0603_1608Metric"
@@ -9227,7 +9227,7 @@
 	)
 	(symbol
 		(lib_id "Device:C")
-		(at 270.51 31.75 0)
+		(at 275.59 31.75 0)
 		(unit 1)
 		(exclude_from_sim no)
 		(in_bom yes)
@@ -9235,25 +9235,25 @@
 		(dnp no)
 		(uuid "1fbfee75-3eb1-5df7-940a-405feb947d3c")
 		(property "Reference" "C1002"
-			(at 270.51 29.718 0)
+			(at 278.384 30.48 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
-				(justify bottom)
+				(justify left)
 			)
 		)
 		(property "Value" "10u"
-			(at 270.51 33.782 0)
+			(at 278.384 33.02 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
-				(justify top)
+				(justify left)
 			)
 		)
 		(property "Footprint" "Capacitor_SMD:C_0805_2012Metric"
-			(at 270.51 31.75 0)
+			(at 275.59 31.75 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -9262,7 +9262,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 270.51 31.75 0)
+			(at 275.59 31.75 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -9271,7 +9271,7 @@
 			)
 		)
 		(property "Description" "Unpolarized capacitor"
-			(at 270.51 31.75 0)
+			(at 275.59 31.75 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -9300,7 +9300,7 @@
 	)
 	(symbol
 		(lib_id "power:GND")
-		(at 270.51 35.56 0)
+		(at 275.59 35.56 0)
 		(unit 1)
 		(exclude_from_sim no)
 		(in_bom no)
@@ -9308,7 +9308,7 @@
 		(dnp no)
 		(uuid "8e6a8d9c-5723-52b3-b64d-1d2d2bc46da8")
 		(property "Reference" "#PWR1014"
-			(at 270.51 38.735 0)
+			(at 275.59 38.735 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -9318,7 +9318,7 @@
 			)
 		)
 		(property "Value" "GND"
-			(at 270.51 38.735 0)
+			(at 275.59 38.735 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -9327,7 +9327,7 @@
 			)
 		)
 		(property "Footprint" ""
-			(at 270.51 35.56 0)
+			(at 275.59 35.56 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -9336,7 +9336,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 270.51 35.56 0)
+			(at 275.59 35.56 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -9345,7 +9345,7 @@
 			)
 		)
 		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
-			(at 270.51 35.56 0)
+			(at 275.59 35.56 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -10077,21 +10077,21 @@
 		(dnp no)
 		(uuid "3e950634-fdc6-5ffa-a240-3099a651f8ff")
 		(property "Reference" "C1003"
-			(at 262.89 98.298 0)
+			(at 265.684 99.06 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
-				(justify bottom)
+				(justify left)
 			)
 		)
 		(property "Value" "100n"
-			(at 262.89 102.362 0)
+			(at 265.684 101.6 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
-				(justify top)
+				(justify left)
 			)
 		)
 		(property "Footprint" "Capacitor_SMD:C_0603_1608Metric"
@@ -10698,21 +10698,21 @@
 		(dnp no)
 		(uuid "a1685449-c627-5bcf-afc0-f76e55a61521")
 		(property "Reference" "C1004"
-			(at 243.84 159.258 0)
+			(at 241.046 160.02 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
-				(justify bottom)
+				(justify right)
 			)
 		)
 		(property "Value" "100n"
-			(at 243.84 163.322 0)
+			(at 241.046 162.56 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
-				(justify top)
+				(justify right)
 			)
 		)
 		(property "Footprint" "Capacitor_SMD:C_0603_1608Metric"
@@ -11136,21 +11136,21 @@
 		(dnp no)
 		(uuid "dd461ce0-6bf6-5176-a65a-d1400e8dd65c")
 		(property "Reference" "C1005"
-			(at 243.84 230.378 0)
+			(at 246.634 231.14 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
-				(justify bottom)
+				(justify left)
 			)
 		)
 		(property "Value" "100n"
-			(at 243.84 234.442 0)
+			(at 246.634 233.68 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
-				(justify top)
+				(justify left)
 			)
 		)
 		(property "Footprint" "Capacitor_SMD:C_0603_1608Metric"

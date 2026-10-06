@@ -41,9 +41,9 @@ def font(hide=False, justify=None, size=1.27):
 
 # --------------------------------------------------------------------------------------------- library
 class Pin:
-    def __init__(self, unit, number, name, etype, x, y, angle, hidden):
+    def __init__(self, unit, number, name, etype, x, y, angle, hidden, length=2.54):
         self.unit, self.number, self.name, self.etype = unit, number, name, etype
-        self.x, self.y, self.angle, self.hidden = x, y, angle, hidden
+        self.x, self.y, self.angle, self.hidden, self.length = x, y, angle, hidden, length
 
 
 class LibSymbol:
@@ -93,8 +93,10 @@ class Library:
             for p in find(sub, "pin"):
                 at = first(p, "at")
                 hidden = first(p, "hide") is not None or "hide" in p
+                ln = first(p, "length")
                 pins.append(Pin(unit, first(p, "number")[1], first(p, "name")[1], p[1],
-                                float(at[1]), float(at[2]), float(at[3]) if len(at) > 3 else 0.0, hidden))
+                                float(at[1]), float(at[2]), float(at[3]) if len(at) > 3 else 0.0, hidden,
+                                float(ln[1]) if ln else 2.54))
         out = copy.deepcopy(node)
         out[1] = Q(lib_id)
         sym = LibSymbol(lib_id, out, pins)
@@ -171,6 +173,8 @@ class Sym:
     def _text_spots(self):
         """Reference/value positions that stay clear of the body, the pins and the wires on them."""
         x0, y0, x1, y1, rect = self.bbox()
+        if self.dnp:                          # KiCad draws the DNP cross larger than the body
+            x0, y0, x1, y1 = x0 - 1.27, y0 - 1.27, x1 + 1.27, y1 + 1.27
         if self.lib.is_power:
             # value text beyond the symbol, in the direction it points
             base = 270 if self.lib.lib_id.endswith("GND") else 90
@@ -181,8 +185,12 @@ class Sym:
             return (spot, spot)
         mode = self.text
         if mode == "auto":
-            if rect and len(self.all_pins()) > 3:
+            pins = self.all_pins()
+            if rect and len(pins) > 3:
                 mode = "ic"
+            elif len(pins) == 2:              # two-terminal part: decide by the pin axis, not the body shape
+                (ax, ay), (bx, by) = (self._xf(p.x, p.y) for p in pins)
+                mode = "right" if abs(ax - bx) < abs(ay - by) else "above"
             elif (x1 - x0) <= (y1 - y0) + 0.01:
                 mode = "right"
             else:
@@ -199,6 +207,18 @@ class Sym:
         if mode == "below":
             return ((cx, y1 + 1.27, "top"), (cx, y1 + 3.81, "top"))
         return ((cx, y0 - 1.27, "bottom"), (cx, y1 + 1.27, "top"))   # above / below
+
+    def pin_segments(self):
+        """Drawn pin lines (connection point → body) in schematic coordinates."""
+        segs = []
+        for p in self.all_pins():
+            if p.hidden or p.length <= 0:
+                continue
+            a = math.radians(p.angle)
+            ex, ey = p.x + p.length * math.cos(a), p.y + p.length * math.sin(a)
+            (x1, y1), (x2, y2) = self._xf(p.x, p.y), self._xf(ex, ey)
+            segs.append((round(x1, 3), round(y1, 3), round(x2, 3), round(y2, 3)))
+        return segs
 
     def all_pins(self):
         return [p for p in self.lib.pins if p.unit in (0, self.unit)]

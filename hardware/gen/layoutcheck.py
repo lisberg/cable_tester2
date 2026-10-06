@@ -43,7 +43,7 @@ def _overlap(a, b, eps=EPS):
 
 
 def _seg_hits_box(seg, box, eps=EPS):
-    x1, y1, x2, y2 = seg
+    x1, y1, x2, y2 = (round(v, 2) for v in seg)
     bx0, by0, bx1, by1 = box[0] + eps, box[1] + eps, box[2] - eps, box[3] - eps
     if bx0 >= bx1 or by0 >= by1:
         return False
@@ -59,6 +59,8 @@ def boxes(sheet, ref_len=5):
     out = []
     for s in sheet.syms:
         x0, y0, x1, y1, _ = s.bbox()
+        if s.dnp:                              # DNP cross extends beyond the body
+            x0, y0, x1, y1 = x0 - 1.27, y0 - 1.27, x1 + 1.27, y1 + 1.27
         name = f"{s.prefix}{s.idx}"
         if not s.lib.is_power:
             out.append(("body", name, (x0, y0, x1, y1)))
@@ -119,11 +121,15 @@ def check(sheet):
                 continue
             if _overlap(t[2], b[2]):
                 issues.append(f"text/body: {t[0]} {t[1]!r} × {b[1]}")
-    # text vs wires (labels sit on their own wire end: skip segments touching the anchor)
+    # text vs wires and vs drawn pin lines (labels sit on their own wire end: skip segments touching the anchor)
+    pin_lines = [(f"{sym.prefix}{sym.idx}", seg) for sym in sheet.syms for seg in sym.pin_segments()]
     for t in texts:
         for seg in sheet.segs:
             if _seg_hits_box(seg, t[2]):
                 issues.append(f"text/wire: {t[0]} {t[1]!r} × wire {seg}")
+        for owner, seg in pin_lines:
+            if _seg_hits_box(seg, t[2]):
+                issues.append(f"text/pin: {t[0]} {t[1]!r} × pin line of {owner} {seg}")
     # wires through bodies (pins end on the body edge, so shrink the box); a wire that starts on one of
     # the symbol's own pins leaves outward by construction and is not a crossing
     own_pins = {}

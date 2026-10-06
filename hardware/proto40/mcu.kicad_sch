@@ -3399,13 +3399,13 @@
 	(wire
 		(pts
 			(xy 139.7 81.28)
-			(xy 170.18 81.28)
+			(xy 180.34 81.28)
 		)
 		(stroke
 			(width 0)
 			(type default)
 		)
-		(uuid "89fc19e3-0f29-5cee-8a4f-0a646f86a079")
+		(uuid "e23b6739-fc24-5ecc-897b-6ec82e4b3ef3")
 	)
 	(wire
 		(pts
@@ -3940,10 +3940,10 @@
 		(uuid "4d27fc30-fee8-58ab-bc5d-ba330f9691a6")
 	)
 	(junction
-		(at 162.56 81.28)
+		(at 167.64 81.28)
 		(diameter 0)
 		(color 0 0 0 0)
-		(uuid "86c7c42a-ff78-5fcc-893a-f41e55a3dec7")
+		(uuid "50e87bbf-02e1-5918-8b7d-462d3c4ac3cb")
 	)
 	(symbol
 		(lib_id "MCU_ST_STM32C0:STM32C071C8Tx")
@@ -4314,21 +4314,21 @@
 		(dnp no)
 		(uuid "7b9ce4cd-3f79-5128-965b-2dd4e82957b7")
 		(property "Reference" "C201"
-			(at 154.94 83.058 0)
+			(at 157.734 83.82 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
-				(justify bottom)
+				(justify left)
 			)
 		)
 		(property "Value" "100n"
-			(at 154.94 87.122 0)
+			(at 157.734 86.36 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
-				(justify top)
+				(justify left)
 			)
 		)
 		(property "Footprint" "Capacitor_SMD:C_0603_1608Metric"
@@ -4442,7 +4442,7 @@
 	)
 	(symbol
 		(lib_id "Device:C")
-		(at 162.56 85.09 0)
+		(at 167.64 85.09 0)
 		(unit 1)
 		(exclude_from_sim no)
 		(in_bom yes)
@@ -4450,25 +4450,25 @@
 		(dnp no)
 		(uuid "575c3c09-771e-53b7-b880-4765c33629fb")
 		(property "Reference" "C202"
-			(at 162.56 83.058 0)
+			(at 170.434 83.82 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
-				(justify bottom)
+				(justify left)
 			)
 		)
 		(property "Value" "100n"
-			(at 162.56 87.122 0)
+			(at 170.434 86.36 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
-				(justify top)
+				(justify left)
 			)
 		)
 		(property "Footprint" "Capacitor_SMD:C_0603_1608Metric"
-			(at 162.56 85.09 0)
+			(at 167.64 85.09 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -4477,7 +4477,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 162.56 85.09 0)
+			(at 167.64 85.09 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -4486,7 +4486,7 @@
 			)
 		)
 		(property "Description" "Unpolarized capacitor"
-			(at 162.56 85.09 0)
+			(at 167.64 85.09 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -4511,7 +4511,7 @@
 	)
 	(symbol
 		(lib_id "power:GND")
-		(at 162.56 88.9 0)
+		(at 167.64 88.9 0)
 		(unit 1)
 		(exclude_from_sim no)
 		(in_bom no)
@@ -4519,7 +4519,7 @@
 		(dnp no)
 		(uuid "80fb618e-4a53-5132-b2b9-939949eca856")
 		(property "Reference" "#PWR204"
-			(at 162.56 92.075 0)
+			(at 167.64 92.075 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -4529,7 +4529,7 @@
 			)
 		)
 		(property "Value" "GND"
-			(at 162.56 92.075 0)
+			(at 167.64 92.075 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -4538,7 +4538,7 @@
 			)
 		)
 		(property "Footprint" ""
-			(at 162.56 88.9 0)
+			(at 167.64 88.9 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -4547,7 +4547,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 162.56 88.9 0)
+			(at 167.64 88.9 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -4556,7 +4556,7 @@
 			)
 		)
 		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
-			(at 162.56 88.9 0)
+			(at 167.64 88.9 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -4578,7 +4578,7 @@
 	)
 	(symbol
 		(lib_id "Device:C")
-		(at 170.18 85.09 0)
+		(at 180.34 85.09 0)
 		(unit 1)
 		(exclude_from_sim no)
 		(in_bom yes)
@@ -4586,25 +4586,25 @@
 		(dnp no)
 		(uuid "c46f5fd9-ff6f-5ac8-8ef9-d3c670939170")
 		(property "Reference" "C203"
-			(at 170.18 83.058 0)
+			(at 183.134 83.82 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
-				(justify bottom)
+				(justify left)
 			)
 		)
 		(property "Value" "4.7u"
-			(at 170.18 87.122 0)
+			(at 183.134 86.36 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
-				(justify top)
+				(justify left)
 			)
 		)
 		(property "Footprint" "Capacitor_SMD:C_0805_2012Metric"
-			(at 170.18 85.09 0)
+			(at 180.34 85.09 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -4613,7 +4613,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 170.18 85.09 0)
+			(at 180.34 85.09 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -4622,7 +4622,7 @@
 			)
 		)
 		(property "Description" "Unpolarized capacitor"
-			(at 170.18 85.09 0)
+			(at 180.34 85.09 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -4647,7 +4647,7 @@
 	)
 	(symbol
 		(lib_id "power:GND")
-		(at 170.18 88.9 0)
+		(at 180.34 88.9 0)
 		(unit 1)
 		(exclude_from_sim no)
 		(in_bom no)
@@ -4655,7 +4655,7 @@
 		(dnp no)
 		(uuid "c8521dc4-d747-5599-a55e-7549af17c7b9")
 		(property "Reference" "#PWR205"
-			(at 170.18 92.075 0)
+			(at 180.34 92.075 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -4665,7 +4665,7 @@
 			)
 		)
 		(property "Value" "GND"
-			(at 170.18 92.075 0)
+			(at 180.34 92.075 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -4674,7 +4674,7 @@
 			)
 		)
 		(property "Footprint" ""
-			(at 170.18 88.9 0)
+			(at 180.34 88.9 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -4683,7 +4683,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 170.18 88.9 0)
+			(at 180.34 88.9 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -4692,7 +4692,7 @@
 			)
 		)
 		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
-			(at 170.18 88.9 0)
+			(at 180.34 88.9 0)
 			(effects
 				(font
 					(size 1.27 1.27)

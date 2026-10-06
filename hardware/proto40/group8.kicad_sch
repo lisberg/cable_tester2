@@ -3320,21 +3320,21 @@
 		(dnp yes)
 		(uuid "19e829bc-d6a0-5f4e-8289-395a77e60b66")
 		(property "Reference" "C1101"
-			(at 82.55 47.498 0)
+			(at 86.614 48.26 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
-				(justify bottom)
+				(justify left)
 			)
 		)
 		(property "Value" "100p"
-			(at 82.55 51.562 0)
+			(at 86.614 50.8 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
-				(justify top)
+				(justify left)
 			)
 		)
 		(property "Footprint" "Capacitor_SMD:C_0603_1608Metric"
@@ -4039,21 +4039,21 @@
 		(dnp yes)
 		(uuid "acb1f717-b434-55b1-85f8-02d1a26eb8f8")
 		(property "Reference" "C1102"
-			(at 82.55 72.898 0)
+			(at 86.614 73.66 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
-				(justify bottom)
+				(justify left)
 			)
 		)
 		(property "Value" "100p"
-			(at 82.55 76.962 0)
+			(at 86.614 76.2 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
-				(justify top)
+				(justify left)
 			)
 		)
 		(property "Footprint" "Capacitor_SMD:C_0603_1608Metric"
@@ -4758,21 +4758,21 @@
 		(dnp yes)
 		(uuid "2da1da77-30ad-57a0-b16c-9d558abf7d79")
 		(property "Reference" "C1103"
-			(at 82.55 98.298 0)
+			(at 86.614 99.06 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
-				(justify bottom)
+				(justify left)
 			)
 		)
 		(property "Value" "100p"
-			(at 82.55 102.362 0)
+			(at 86.614 101.6 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
-				(justify top)
+				(justify left)
 			)
 		)
 		(property "Footprint" "Capacitor_SMD:C_0603_1608Metric"
@@ -5477,21 +5477,21 @@
 		(dnp yes)
 		(uuid "53963d63-4b32-5bc4-b33c-1981533d7e1f")
 		(property "Reference" "C1104"
-			(at 82.55 123.698 0)
+			(at 86.614 124.46 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
-				(justify bottom)
+				(justify left)
 			)
 		)
 		(property "Value" "100p"
-			(at 82.55 127.762 0)
+			(at 86.614 127 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
-				(justify top)
+				(justify left)
 			)
 		)
 		(property "Footprint" "Capacitor_SMD:C_0603_1608Metric"
@@ -6196,21 +6196,21 @@
 		(dnp yes)
 		(uuid "a6595add-54c2-51d1-a519-16b165cd6f4f")
 		(property "Reference" "C1105"
-			(at 82.55 149.098 0)
+			(at 86.614 149.86 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
-				(justify bottom)
+				(justify left)
 			)
 		)
 		(property "Value" "100p"
-			(at 82.55 153.162 0)
+			(at 86.614 152.4 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
-				(justify top)
+				(justify left)
 			)
 		)
 		(property "Footprint" "Capacitor_SMD:C_0603_1608Metric"
@@ -6915,21 +6915,21 @@
 		(dnp yes)
 		(uuid "c3c836c6-26f6-5a9a-a70b-ba7819c877de")
 		(property "Reference" "C1106"
-			(at 82.55 174.498 0)
+			(at 86.614 175.26 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
-				(justify bottom)
+				(justify left)
 			)
 		)
 		(property "Value" "100p"
-			(at 82.55 178.562 0)
+			(at 86.614 177.8 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
-				(justify top)
+				(justify left)
 			)
 		)
 		(property "Footprint" "Capacitor_SMD:C_0603_1608Metric"
@@ -7634,21 +7634,21 @@
 		(dnp yes)
 		(uuid "f688d075-eecd-557c-a700-342e997e4dd1")
 		(property "Reference" "C1107"
-			(at 82.55 199.898 0)
+			(at 86.614 200.66 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
-				(justify bottom)
+				(justify left)
 			)
 		)
 		(property "Value" "100p"
-			(at 82.55 203.962 0)
+			(at 86.614 203.2 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
-				(justify top)
+				(justify left)
 			)
 		)
 		(property "Footprint" "Capacitor_SMD:C_0603_1608Metric"
@@ -8353,21 +8353,21 @@
 		(dnp yes)
 		(uuid "a545905b-7b41-58bc-943f-386841394bb0")
 		(property "Reference" "C1108"
-			(at 82.55 225.298 0)
+			(at 86.614 226.06 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
-				(justify bottom)
+				(justify left)
 			)
 		)
 		(property "Value" "100p"
-			(at 82.55 229.362 0)
+			(at 86.614 228.6 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
-				(justify top)
+				(justify left)
 			)
 		)
 		(property "Footprint" "Capacitor_SMD:C_0603_1608Metric"
@@ -8954,21 +8954,21 @@
 		(dnp no)
 		(uuid "38951eb7-bbfa-5641-84d9-0e8b7e7f1a5d")
 		(property "Reference" "C1109"
-			(at 177.8 75.438 0)
+			(at 180.594 76.2 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
-				(justify bottom)
+				(justify left)
 			)
 		)
 		(property "Value" "100n"
-			(at 177.8 79.502 0)
+			(at 180.594 78.74 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
-				(justify top)
+				(justify left)
 			)
 		)
 		(property "Footprint" "Capacitor_SMD:C_0603_1608Metric"
@@ -9684,21 +9684,21 @@
 		(dnp no)
 		(uuid "0d73d617-503d-5784-a4ac-2c24023e1b39")
 		(property "Reference" "C1110"
-			(at 259.08 72.898 0)
+			(at 256.286 73.66 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
-				(justify bottom)
+				(justify right)
 			)
 		)
 		(property "Value" "100n"
-			(at 259.08 76.962 0)
+			(at 256.286 76.2 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
-				(justify top)
+				(justify right)
 			)
 		)
 		(property "Footprint" "Capacitor_SMD:C_0603_1608Metric"

@@ -62,11 +62,12 @@ def decap(s, ic, pin="VCC", rail="VDD5", values=("100n",), dx=None, up=None, sid
     s.power(rail, x, top, 90)
     caps = []
     for i, v in enumerate(values):
-        cx = x + dx + side * 7.62 * i
-        caps.append(C(s, (cx, top + 3.81), v, fp=FP_C0805 if v.endswith("u") and v not in ("1u",) else FP_C0603))
+        cx = x + dx + side * 12.7 * i
+        caps.append(C(s, (cx, top + 3.81), v, fp=FP_C0805 if v.endswith("u") and v not in ("1u",) else FP_C0603,
+                      text="right" if side > 0 else "left"))
         s.connect(caps[-1], "2", "GND")
         caps[-1].pin("1")
-    s.wire(x, top, x + dx + side * 7.62 * (len(values) - 1), top)
+    s.wire(x, top, x + dx + side * 12.7 * (len(values) - 1), top)
     return caps
 
 
@@ -561,11 +562,11 @@ def build_power():
     fl3 = s.add("power:PWR_FLAG", "#FLG", (xr0 + 20.32, yv))
     fl3.pin("1")
     for i, v in enumerate(["10u", "10u", "100n"]):
-        cap_down(s, xr0 + 27.94 + 7.62 * i, yv, v, fp=FP_C0805 if v == "10u" else FP_C0603)
-    tp = s.add("Connector:TestPoint", "TP", (xr0 + 50.8, yv), value="VDD5", footprint=FP_TP, text="right")
+        cap_down(s, xr0 + 27.94 + 12.7 * i, yv, v, fp=FP_C0805 if v == "10u" else FP_C0603)
+    tp = s.add("Connector:TestPoint", "TP", (xr0 + 63.5, yv), value="VDD5", footprint=FP_TP, text="right")
     tp.pin("1")
     # shunt clamp: PNP on VDD5, TL431 sets ~5.45 V
-    q = s.add("Transistor_BJT:BCP53", "Q", (215.9, 93.98), rot=180, text="left",
+    q = s.add("Transistor_BJT:BCP53", "Q", (xr0 + 80.01, 93.98), rot=180, text="left",
               fields={"MPN": "BCP53-16", "Note": "shunt pass, ≥ 1 W"})
     xe, ye = q.pos("E")
     s.wire(xe, ye, xe, yv)
@@ -597,13 +598,14 @@ def build_power():
     s.path(rt.pos("2"), (XD, YD))
     pull(s, XD, YD, "GND", "10k", up=False)
     # 3.3 V LDO
-    ldo = s.add("Regulator_Linear:AP2112K-3.3", "U", (190.5, 165.1), fields={"MPN": "AP2112K-3.3TRG1"})
+    ldo = s.add("Regulator_Linear:AP2112K-3.3", "U", (190.5, 165.1), text="icright",
+                fields={"MPN": "AP2112K-3.3TRG1"})
     xi, yi = ldo.pos("VIN")
     s.wire(xi, yi, xi - 20.32, yi)
     s.power("VDD5", xi - 20.32, yi, 90)
     xe2, ye2 = ldo.pos("EN")
     s.path((xe2, ye2), (xe2 - 5.08, ye2), (xe2 - 5.08, yi))
-    cap_down(s, xi - 12.7, yi, "1u")
+    cap_down(s, xi - 12.7, yi, "1u", text="left")
     s.connect(ldo, "GND", "GND")
     s.connect(ldo, "NC", None)
     xo, yo = ldo.pos("VOUT")
