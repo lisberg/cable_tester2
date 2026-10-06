@@ -210,8 +210,8 @@ NODE ─┼── clamp diode to VDD5 ┐  BAV199‑class (low leakage), two nod
 * **Correction from simulation:** low‑leakage clamps (BAV199 class) have a *higher* Vf than the CMOS input
   ESD diodes, so ≈ 95 % of the fault current still flows through the mux/'165 input structures. Rs is the
   real limiter. ≤ 6.3 mA per input is inside the 74HC ±20 mA clamp‑current rating; **TMUX1308
-  injection/clamp rating must be confirmed in Phase 2**. The external clamps are kept as a footprint
-  option (DNP on Proto40) rather than relied upon.
+  injection/clamp rating must be confirmed in Phase 2**. External clamps are therefore omitted on Proto40.
+  Protection = TVS + Rs + IC input diodes + VDD5 shunt clamp.
 * **Rail pumping:** 8 faulted nodes × 3.9 mA ≈ 31 mA per side, up to ~250 mA for a whole system,
   flowing *into* VDD5. VBUS cannot sink current, so VDD5 needs an **active shunt clamp** (TLV431 + pass
   transistor, set ≈ 5.45 V, rated ≥ 300 mA). The VBUS load switch must block reverse current so the host
@@ -457,7 +457,7 @@ The host tool converts it into the EEPROM `PINMAP` and, together with the cable 
 | **0 – Spec freeze** | Resolve D1–D10; freeze EEPROM format v1 header/PINMAP; write ADRs; fixture connector + mechanical concept sketch; power and timing budget | `docs/adr/*`, updated block diagram, budget spreadsheet | Decisions signed off |
 | **1 – Infrastructure** ✅ | Repo layout, KiCad template (stack‑up, net classes, `.kicad_dru`, title block), lib tables, CI (kicad‑cli) on an empty project | Green CI on template | Any contributor clones and opens every project without missing libs |
 | **2 – Library & simulation** | Symbols/footprints for STM32C071, TMUX1308, '165/'595 (LV/AHC), TVS arrays, DIN 41612, USB‑C, EEPROM; 3D models. ngspice sim of channel cell + 5 m cable + worst‑case net | Library with MPNs; `hardware/sim` results in `docs/` | Margins in F3 confirmed incl. tolerances & leakage at temperature |
-| **3 – Proto40** | Single 4‑layer board: controller section + 5 groups per side (40+40 symmetric nodes) + 2 small fixture connectors (with ID_SDA/SCL/WP/PRESENT pins) + all internal test nodes + a mini test adapter carrying the profile EEPROM. Generous test points, 0603 parts, DNP cap per node, jumper‑selectable Rbias/Rs options | Fabricated proto, bring‑up firmware (chains, mux, STIM, ADC, USB CDC, EEPROM profile read) | No ghost hits; open/short/swap/resistive‑short detection demonstrated; leakage & settle measured vs. sim |
+| **3 – Proto40** 🟡 schematic done | Single 4‑layer board: controller section + 5 groups per side (40+40 symmetric nodes) + 2 small fixture connectors (with ID_SDA/SCL/WP/PRESENT pins) + all internal test nodes + a mini test adapter carrying the profile EEPROM. Generous test points, 0603 parts, DNP cap per node, jumper‑selectable Rbias/Rs options | Fabricated proto, bring‑up firmware (chains, mux, STIM, ADC, USB CDC, EEPROM profile read) | No ghost hits; open/short/swap/resistive‑short detection demonstrated; leakage & settle measured vs. sim |
 | **4 – Rev A boards** | Bank card (hierarchy as in 2.2, multichannel layout reuse), controller, backplane — schematics → review → layout → review | Fab packages for 3 boards | Design reviews passed (checklist below), CI green |
 | **5 – Adapters** | Adapter template + first real cable family adapter pair; host tool `ctfx build/verify/program` | Adapter fab package + EEPROM image generated from netlists | Image auto‑generated and CI‑verified against adapter netlist; standalone test (no PC) passes/fails seeded faults |
 | **6 – Integration** | 1 bank → 4 banks; self‑test, adapter ID, logging, enclosure & fixture mechanics | System test report | Full 200‑pin cable tested < 1 s, self‑test catches seeded faults |
@@ -488,4 +488,9 @@ Layout review:
 1. Remaining open decision: D6 (backplane), needed for Phase 4 only.
 2. ~~Set up Phase 1 infrastructure~~ (done: template, lib tables, CI on pull requests).
 3. ~~Build the ngspice channel‑cell model and lock Rs/Rbias/Rlim~~ (done, `hardware/sim`).
-4. Start Proto40 schematic using the `channel` / `group8` blocks that will carry straight into the bank card.
+4. ~~Start Proto40 schematic~~ — **done** (generated, ERC clean, design‑intent audit passes): `hardware/proto40`,
+   generator in `hardware/gen`. Before layout:
+   * Verify the TMUX1308 pinout (pin 7 NC, active‑low EN) and injection rating against the TI datasheet.
+   * Confirm the STM32C071 alternate functions with STM32CubeMX (SPI1 PA5/6/7, I2C1 PB6/7, USB PA11/12, ADC PA0/1).
+   * Select the TVS part (bidirectional, VRWM ≥ 28 V, ≤ 100 nA at 5 V, SOD‑323) and fill LCSC numbers for JLCPCB assembly.
+5. Proto40 PCB layout (4‑layer JLCPCB): route one `group8`, replicate with KiCad multichannel tools.

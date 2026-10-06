@@ -14,6 +14,6 @@
 | D10 | 2026‑10‑01 | Adapter EEPROM carries identity + embedded test profiles | `docs/adapter-eeprom-format.md` |
 | D11 | 2026‑10‑06 | Prototype = Proto40 (40 + 40 nodes) | |
 | D12 | 2026‑10‑01 | First adapter: ADP‑0001 Tap/M12/Fluidic (cables C1, C2 and chain C3) | `fixtures/ADP0001_tap_fluidic` |
-| D13 | 2026‑10‑06 | ADP‑0001 C2: GND wires are commoned (one GND net) | Customer answer. C1 still to confirm |
+| D13 | 2026‑10‑06 | ADP‑0001 harness only: GND wires are commoned (one GND net in C2) | Harness‑specific, **not** a general tester rule. Each cable profile states its own GND topology. C1 still to confirm |
 
 Open: D6 (backplane, Phase 4).

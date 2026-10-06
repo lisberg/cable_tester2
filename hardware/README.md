@@ -9,7 +9,9 @@ All KiCad projects live **one level below `hardware/`**, so the project library 
 | `lib/cable_tester.pretty/` | Project footprints |
 | `lib/3dmodels/` | STEP models, referenced as `${KIPRJMOD}/../lib/3dmodels/<file>.step` |
 | `_template/` | Base project: JLCPCB 4‑layer stack‑up, design rules, net classes, custom rules, title block |
-| `proto40/` | Prototype 1 (controller + 40 + 40 nodes), empty project for now |
+| `proto40/` | Prototype 1 (controller + 40 + 40 nodes). **Schematic generated** by `gen/proto40.py`. No layout yet (`CI_STAGE` = schematic) |
+| `gen/` | Schematic generators + design‑intent audit (see `gen/README.md`) |
+| `sim/` | ngspice channel‑cell simulation and report |
 
 ## New board
 
@@ -34,6 +36,7 @@ scripts/new_board.sh <name> "<Board title>"
 
 ## Checks
 
-`scripts/kicad_check.sh` runs ERC + DRC (with schematic parity) on every project. CI runs it on every pull
-request (`.github/workflows/kicad.yml`) and uploads schematic PDFs and BOMs. Tags `hw/<board>/vX.Y` also
+`scripts/kicad_check.sh` runs ERC + DRC (with schematic parity) on every project. A project with a `CI_STAGE` file containing `schematic` skips DRC until layout starts. CI runs it on every pull
+request (`.github/workflows/kicad.yml`), together with a regeneration check for generated schematics and the Proto40
+netlist audit, and uploads schematic PDFs and BOMs. Tags `hw/<board>/vX.Y` also
 produce Gerbers, drill, pick‑and‑place and STEP.

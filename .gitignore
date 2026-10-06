@@ -8,3 +8,6 @@ _autosave-*
 ~*.lck
 # Outputs (produced by CI)
 build/
+# Python
+__pycache__/
+*.pyc

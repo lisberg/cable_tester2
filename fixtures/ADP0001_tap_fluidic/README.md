@@ -55,7 +55,8 @@ RESULT
 2. **Shells and shield:** are the M12 coupling nuts or shells metal, and are the cables shielded?
    If so, where does the shield/drain land? This decides whether channels B35/B36 are tested or left
    as don't‑care.
-3. ~~Ground wires isolated?~~ **Answered 2026‑10‑06: not isolated (commoned).** Applied to C2.
+3. ~~Ground wires isolated?~~ **Answered 2026‑10‑06: not isolated (commoned), for this harness only.** Applied to C2.
+   Other harnesses define their own GND topology in their netlists. There is no global assumption.
    3b. **Does the same apply to C1** (ribbon → M12 female)? Are FFSD 1, 2, 5, 6, 11, 12, 16 joined inside
    the cable, or only on the Tap PCB? Currently modelled as separate conductors.
 4. **FTSH variant on the Tap board** (e.g. FTSH‑108‑01‑L‑DV‑K, keyed/shrouded?) and FFSD polarisation.

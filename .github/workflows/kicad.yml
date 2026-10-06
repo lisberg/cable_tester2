@@ -5,6 +5,7 @@ on:
     paths:
       - "hardware/**"
       - "scripts/kicad_*.sh"
+      - "hardware/gen/**"
       - ".github/workflows/kicad.yml"
   push:
     tags:
@@ -20,7 +21,24 @@ jobs:
     env:
       HOME: /root
     steps:
+      - name: Tools (git for checkout/diff, zip for fab packages)
+        run: apt-get update -qq && apt-get install -y -qq git zip >/dev/null
       - uses: actions/checkout@v4
+      - name: KiCad global library tables
+        run: |
+          mkdir -p ~/.config/kicad/10.0
+          cp /usr/share/kicad/template/sym-lib-table /usr/share/kicad/template/fp-lib-table ~/.config/kicad/10.0/
+      - name: Generated schematics are up to date
+        run: |
+          python3 hardware/gen/make_lib.py
+          python3 hardware/gen/proto40.py
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git diff --exit-code -- hardware/lib hardware/proto40 || {
+            echo "::error::Generated files differ - run hardware/gen scripts and commit the result"; exit 1; }
+      - name: Proto40 design-intent audit
+        run: |
+          kicad-cli sch export netlist -o /tmp/proto40.net hardware/proto40/proto40.kicad_sch
+          python3 hardware/gen/check_proto40.py /tmp/proto40.net
       - name: ERC / DRC
         run: scripts/kicad_check.sh build/checks
       - name: Review outputs (schematic PDF, BOM)
@@ -28,9 +46,7 @@ jobs:
         run: scripts/kicad_outputs.sh build/outputs
       - name: Fabrication outputs (tags only)
         if: startsWith(github.ref, 'refs/tags/hw/')
-        run: |
-          apt-get update -qq && apt-get install -y -qq zip >/dev/null
-          scripts/kicad_outputs.sh build/outputs --fab
+        run: scripts/kicad_outputs.sh build/outputs --fab
       - uses: actions/upload-artifact@v4
         if: always()
         with:
