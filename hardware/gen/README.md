@@ -50,4 +50,10 @@ The sheets are drawn the way an engineer would draw them:
 * Reference and value text is placed from the real symbol body graphics, away from pins and wires.
   `layoutcheck.py` enforces it.
 
+* **Every pin leaves through its own short wire** (≥ 2.54 mm): no part stands directly on another wire,
+  another pin or a power symbol. Pull-ups, caps, TVS diodes, test points and power flags tap a line with a
+  short stub and a junction dot. `layoutcheck.py` enforces this (pin/pin, pin/wire).
+* On dense pin columns (MCU, connectors) local labels never sit directly under a hierarchical label.
+  They get longer stubs, or the power tie is drawn sideways.
+
 Junctions are added automatically wherever three connections meet or a wire/pin ends on a wire.

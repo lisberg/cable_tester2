@@ -77,16 +77,17 @@ def boxes(sheet, ref_len=5):
             at = [e for e in it if isinstance(e, list) and e[0] == "at"][0]
             x, y, a = float(at[1]), float(at[2]), int(at[3])
             n = len(name) + (2 if it[0] != "label" else 0)          # shape outline for hier/global
-            w, h = n * CHAR * SIZE, SIZE
-            lift = 0.3 if it[0] == "label" else 0
+            w, h = n * CHAR * SIZE, SIZE * 1.3
+            lift = 0.25 if it[0] == "label" else 0
+            hh = 1.0                                                # half height of hier/global label outline
             if a == 0:
-                box = (x, y - h - lift, x + w, y - lift) if it[0] == "label" else (x, y - h * 0.7, x + w, y + h * 0.7)
+                box = (x, y - h - lift, x + w, y - lift) if it[0] == "label" else (x, y - hh, x + w, y + hh)
             elif a == 180:
-                box = (x - w, y - h - lift, x, y - lift) if it[0] == "label" else (x - w, y - h * 0.7, x, y + h * 0.7)
+                box = (x - w, y - h - lift, x, y - lift) if it[0] == "label" else (x - w, y - hh, x, y + hh)
             elif a == 90:
-                box = (x - h - lift, y - w, x - lift, y) if it[0] == "label" else (x - h * 0.7, y - w, x + h * 0.7, y)
+                box = (x - h - lift, y - w, x - lift, y) if it[0] == "label" else (x - hh, y - w, x + hh, y)
             else:
-                box = (x - h - lift, y, x - lift, y + w) if it[0] == "label" else (x - h * 0.7, y, x + h * 0.7, y + w)
+                box = (x - h - lift, y, x - lift, y + w) if it[0] == "label" else (x - hh, y, x + hh, y + w)
             out.append(("label", name, box))
         elif it[0] == "text":
             at = [e for e in it if isinstance(e, list) and e[0] == "at"][0]
@@ -137,14 +138,43 @@ def check(sheet):
         own_pins.setdefault(f"{sym.prefix}{sym.idx}", set()).update(
             (x, y) for x, y, _ in (sym.pin(p.number, mark=False) for p in sym.all_pins()))
     for b in bodies:
-        if b[1].startswith("#PWR"):
-            continue
         pins = own_pins.get(b[1], set())
         for seg in sheet.segs:
             if (seg[0], seg[1]) in pins or (seg[2], seg[3]) in pins:
                 continue
             if _seg_hits_box(seg, b[2], eps=0.6):
                 issues.append(f"wire/body: {b[1]} × wire {seg}")
+    # every connected pin leaves through its own short wire: no pin directly on another pin, on a power
+    # symbol, or on the middle of a wire (house style)
+    ends, segs = {}, sheet.segs
+    for x1, y1, x2, y2 in segs:
+        for pt in ((x1, y1), (x2, y2)):
+            ends[pt] = ends.get(pt, 0) + 1
+    ncs = {(float(e[1]), float(e[2])) for it in sheet.items if it[0] == "no_connect"
+           for e in it if isinstance(e, list) and e[0] == "at"}
+    owner = {}
+    for sym in sheet.syms:
+        for p in sym.all_pins():
+            if p.hidden:
+                continue
+            pt = sym.pin(p.number, mark=False)[:2]
+            owner.setdefault(pt, set()).add(f"{sym.prefix}{sym.idx}")
+    for sym in sheet.syms:
+        name = f"{sym.prefix}{sym.idx}"
+        for p in sym.all_pins():
+            if p.hidden or p.etype == "no_connect":
+                continue
+            pt = sym.pin(p.number, mark=False)[:2]
+            if pt in ncs:
+                continue
+            others = owner.get(pt, set()) - {name}
+            if others:
+                issues.append(f"pin/pin: {name}.{p.number} sits directly on {sorted(others)}")
+            elif not ends.get(pt):
+                inside = any((x1 == x2 == pt[0] and min(y1, y2) < pt[1] < max(y1, y2)) or
+                             (y1 == y2 == pt[1] and min(x1, x2) < pt[0] < max(x1, x2)) for x1, y1, x2, y2 in segs)
+                issues.append(f"pin/{'wire' if inside else 'none'}: {name}.{p.number} has no own wire"
+                              + (" (sits on a wire)" if inside else ""))
     # body vs body
     for i, a in enumerate(bodies):
         for b in bodies[i + 1:]:

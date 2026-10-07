@@ -53,7 +53,7 @@ def decap(s, ic, pin="VCC", rail="VDD5", values=("100n",), dx=None, up=None, sid
     x, y = ic.pos(pin)
     x0, y0, x1, y1, _ = ic.bbox()
     if up is None:                      # cap + GND symbol + text must clear the body top
-        up = max(5.08, round((y - y0 + 12.7) / U) * U)
+        up = max(7.62, round((y - y0 + 17.78) / U) * U)
     if dx is None:
         edge = (x1 - x) if side > 0 else (x - x0)
         dx = side * max(7.62, round((edge + 5.08) / U) * U)
@@ -63,31 +63,59 @@ def decap(s, ic, pin="VCC", rail="VDD5", values=("100n",), dx=None, up=None, sid
     caps = []
     for i, v in enumerate(values):
         cx = x + dx + side * 12.7 * i
-        caps.append(C(s, (cx, top + 3.81), v, fp=FP_C0805 if v.endswith("u") and v not in ("1u",) else FP_C0603,
+        caps.append(C(s, (cx, top + U + 3.81), v, fp=FP_C0805 if v.endswith("u") and v not in ("1u",) else FP_C0603,
                       text="right" if side > 0 else "left"))
         s.connect(caps[-1], "2", "GND")
-        caps[-1].pin("1")
+        s.path((cx, top), caps[-1].pos("1"))
     s.wire(x, top, x + dx + side * 12.7 * (len(values) - 1), top)
     return caps
 
 
 def pull(s, x, y, rail, value, up=True, text="auto", **kw):
-    """Resistor standing on (up) or hanging from (down) a point of a horizontal wire."""
+    """Resistor above (up) or below (down) a point of a horizontal wire, joined by its own short wire."""
     if up:
-        r = R(s, (x, y - 3.81), value, text=text, **kw)
-        s.connect(r, "1", rail, stub=0)
-        r.pin("2")
+        r = R(s, (x, y - U - 3.81), value, text=text, **kw)
+        s.connect(r, "1", rail)
+        s.path((x, y), r.pos("2"))
     else:
-        r = R(s, (x, y + 3.81), value, text=text, **kw)
-        s.connect(r, "2", rail, stub=0)
-        r.pin("1")
+        r = R(s, (x, y + U + 3.81), value, text=text, **kw)
+        s.connect(r, "2", rail)
+        s.path((x, y), r.pos("1"))
+    return r
+
+
+def tap_tp(s, x, y, value):
+    """Test point above a wire point, on its own short wire."""
+    tp = s.add("Connector:TestPoint", "TP", (x, y - U), value=value, footprint=FP_TP, text="right")
+    s.path((x, y), tp.pos("1"))
+    return tp
+
+
+def tap_power(s, net, x, y):
+    """Power symbol (rail up / GND down) on a short wire from a wire point."""
+    dy = U if net == "GND" else -U
+    s.wire(x, y, x, y + dy)
+    s.power(net, x, y + dy, 270 if net == "GND" else 90)
+
+
+def tap_flag(s, x, y):
+    fl = s.add("power:PWR_FLAG", "#FLG", (x, y - U))
+    s.path((x, y), fl.pos("1"))
+    return fl
+
+
+def r_down(s, x, y, value, **kw):
+    """Resistor hanging below a wire point on its own short wire; returns it (bottom pin free)."""
+    r = R(s, (x, y + U + 3.81), value, **kw)
+    s.path((x, y), r.pos("1"))
     return r
 
 
 def cap_down(s, x, y, value, **kw):
-    c = C(s, (x, y + 3.81), value, **kw)
+    """Capacitor to GND below a point of a horizontal wire, joined by its own short wire."""
+    c = C(s, (x, y + U + 3.81), value, **kw)
     s.connect(c, "2", "GND")
-    c.pin("1")
+    s.path((x, y), c.pos("1"))
     return c
 
 
@@ -104,14 +132,15 @@ def build_group8():
     s.text("Channel cell (x8):  EXT -> TVS to GND, Rs 4.7 kOhm -> NODE -> Rbias 680 kOhm to BIAS_RAIL, C (DNP).\n"
            "NODE goes to the 1st-stage mux (stimulus / ADC path) and to the '165 (sense bitmap).", 25.4, 15.24)
     X_HL, X_TVS, X_RS, X_RB, X_CF, X_NL, X_RAIL = 27.94, 40.64, 58.42, 72.39, 82.55, 93.98, 106.68
-    ys = [45.72 + 25.4 * k for k in range(8)]
+    ys = [43.18 + 30.48 * k for k in range(8)]
+    Y_RB = 10.16                                       # Rbias top pin / rail tap above the node line
     for k, y in enumerate(ys):
         s.label(f"EXT{k}", X_HL, y, 180, kind="hier", shape="passive")
         s.wire(X_HL, y, X_RS - 3.81, y)
-        tvs = s.add("Device:D_TVS", "D", (X_TVS, y + 3.81), rot=90, value="TVS 28V",
+        tvs = s.add("Device:D_TVS", "D", (X_TVS, y + U + 3.81), rot=90, value="TVS 28V",
                     footprint="Diode_SMD:D_SOD-323",
                     fields={"MPN": "TBD: bidirectional, VRWM >= 28 V, IR <= 100 nA @ 5 V, SOD-323"})
-        tvs.pin("2")
+        s.path((X_TVS, y), tvs.pos("2"))
         s.connect(tvs, "1", "GND")
         rs = R(s, (X_RS, y), "4.7k", rot=90, fp=FP_R1206,
                fields={"MPN": "1206 4.7 kΩ 1 % 0.25 W", "Note": "Rs, fault-rated, see sim"})
@@ -119,13 +148,13 @@ def build_group8():
         rs.pin("2")
         s.wire(X_RS + 3.81, y, X_NL, y)
         s.label(f"NODE{k}", X_NL, y, 0)
-        rb = R(s, (X_RB, y - 3.81), "680k", fields={"MPN": "0603 680 kΩ 1 %", "Note": "Rbias, see sim"})
-        rb.pin("2")
-        s.path(rb.pos("1"), (X_RAIL, y - 7.62))
-        cf = cap_down(s, X_CF, y, "100p", dnp=True)
-    s.wire(X_RAIL, ys[0] - 7.62, X_RAIL, ys[-1] - 7.62)
-    s.wire(X_RAIL, ys[0] - 7.62, X_RAIL + 7.62, ys[0] - 7.62)
-    s.label("BIAS_RAIL", X_RAIL + 7.62, ys[0] - 7.62, 0, kind="hier", shape="passive")
+        rb = R(s, (X_RB, y - U - 3.81), "680k", fields={"MPN": "0603 680 kΩ 1 %", "Note": "Rbias, see sim"})
+        s.path((X_RB, y), rb.pos("2"))
+        s.path(rb.pos("1"), (X_RAIL, y - Y_RB))
+        cap_down(s, X_CF, y, "100p", dnp=True)
+    s.wire(X_RAIL, ys[0] - Y_RB, X_RAIL, ys[-1] - Y_RB)
+    s.wire(X_RAIL, ys[0] - Y_RB, X_RAIL + 7.62, ys[0] - Y_RB)
+    s.label("BIAS_RAIL", X_RAIL + 7.62, ys[0] - Y_RB, 0, kind="hier", shape="passive")
 
     mux = s.add("cable_tester:TMUX1308", "U", (165.1, 96.52), footprint=FP_TSSOP16)
     hier(s, mux, "D", "MUXOUT")
@@ -139,7 +168,7 @@ def build_group8():
 
     sr = s.add("74xx:74HC165", "U", (271.78, 101.6), footprint=FP_TSSOP16, text="icright",
                fields={"MPN": "SN74HC165PWR", **TI})
-    hier(s, sr, "DS", "SER_IN", "input")
+    hier(s, sr, "DS", "SER_IN", "input", stub=15.24)
     for k in range(8):
         s.connect(sr, f"D{k}", f"NODE{k}")
     hier(s, sr, "~{PL}", "PL_N", "input")
@@ -193,11 +222,15 @@ def build_side(group8):
                 hier(s, j, pin, net, "bidirectional" if net.startswith("ID_S") else "input")
             elif net == "PRESENT_N":
                 x, y = j.pos(pin)
-                s.wire(x, y, x + 15.24, y)
-                s.label("PRESENT_N", x + 15.24, y, 0, kind="hier", shape="input")
-                pull(s, x + 7.62, y, "+3V3", "10k")
-            else:
+                s.wire(x, y, x + 25.4, y)
+                s.label("PRESENT_N", x + 25.4, y, 0, kind="hier", shape="input")
+                pull(s, x + 15.24, y, "+3V3", "10k")
+            elif net == "GND":
                 s.connect(j, pin, net, rotate=True)
+            elif net == "ID_VCC":
+                s.connect(j, pin, net, stub=17.78)       # clear of the ID_SCL label above
+            else:
+                s.connect(j, pin, net, stub=7.62)
     # six groups with control rails
     GX, GW = 101.6, 38.1
     rails = ["BIAS_RAIL", "ADDR1_0", "ADDR1_1", "ADDR1_2", "EN2_N", "SCK5", "PL5_N"]
@@ -244,7 +277,7 @@ def build_side(group8):
     sr = s.add("74xx:74HC595", "U", (250.19, 53.34), footprint=FP_TSSOP16, fields={"MPN": "SN74HC595PWR", **TI})
     hier(s, sr, "SER", "CTRL_IN", "input", stub=7.62)
     hier(s, sr, "SRCLK", "SCK5", "input", stub=7.62)
-    s.connect(sr, "~{SRCLR}", "VDD5")
+    s.connect(sr, "~{SRCLR}", "VDD5", rotate=True)       # sideways: rows above/below are occupied
     hier(s, sr, "RCLK", "RCLK5", "input", stub=7.62)
     hier(s, sr, "~{OE}", "OE5_N", "input", stub=7.62)
     for q, n in zip(["QA", "QB", "QC", "QD", "QE", "QF", "QG", "QH"],
@@ -259,9 +292,9 @@ def build_side(group8):
     for k in range(3):
         s.connect(m2, f"SEL{k}", f"ADDR2_{k}")
     x, y = m2.pos("~{E}")
-    s.wire(x, y, x - 22.86, y)
-    s.label("EN2_N", x - 22.86, y, 180)
-    pull(s, x - 15.24, y, "VDD5", "100k", text="left", fields={"Note": "mux off while 595 outputs are Hi-Z"})
+    s.wire(x, y, x - 33.02, y)
+    s.label("EN2_N", x - 33.02, y, 180)
+    pull(s, x - 25.4, y, "VDD5", "100k", text="left", fields={"Note": "mux off while 595 outputs are Hi-Z"})
     for g in range(6):
         s.connect(m2, f"S{g}", f"MUX{g + 1}")
     x, y = m2.pos("S6")
@@ -288,8 +321,7 @@ def build_side(group8):
     x, y = bd.pos("4")
     s.wire(x, y, x + 27.94, y)
     s.label("BIAS_RAIL", x + 27.94, y, 0)
-    tp = s.add("Connector:TestPoint", "TP", (x + 10.16, y), value="BIAS_RAIL", footprint=FP_TP, text="right")
-    tp.pin("1")
+    tap_tp(s, x + 10.16, y, "BIAS_RAIL")
     # fixture ID supply
     rid = R(s, (232.41, 228.6), "47", rot=90, fields={"Note": "ID_VCC current limit"})
     x1, y1 = rid.pos("1")
@@ -328,7 +360,7 @@ def build_control():
                                                  (None, None)])]):
         units = []
         for u in range(5):
-            units.append(s.add("74xx:74AHCT125", "U", (x0, 40.64 + 25.4 * u + (12.7 if u == 4 else 0)),
+            units.append(s.add("74xx:74AHCT125", "U", (x0, 40.64 + 25.4 * u + (25.4 if u == 4 else 0)),
                                unit=u + 1, footprint=FP_TSSOP14, text="icright",
                                same_as=units[0] if units else None, fields={"MPN": "SN74AHCT125PWR", **TI}))
         for unit, (src, dst) in zip(units[:4], pairs):
@@ -348,7 +380,7 @@ def build_control():
         s.connect(units[4], "GND", "GND")
         decap(s, units[4], "VCC", side=-1)
     # MISO return buffer (3.3 V)
-    mb = s.add("74xGxx:74LVC1G125", "U", (83.82, 190.5), footprint=FP_SOT235, text="icright", fields={"MPN": "SN74LVC1G125DBVR", **TI})
+    mb = s.add("74xGxx:74LVC1G125", "U", (83.82, 220.98), footprint=FP_SOT235, text="icright", fields={"MPN": "SN74LVC1G125DBVR", **TI})
     hier(s, mb, "2", "SENSE_LAST", "input", stub=10.16)
     x, y = mb.pos("1")
     s.path((x, y), (x, y - 5.08), (x + 15.24, y - 5.08), (x + 15.24, y - 2.54))
@@ -357,7 +389,7 @@ def build_control():
     decap(s, mb, "VCC", rail="+3V3", side=-1)
     s.connect(mb, "GND", "GND")
     # stimulus driver
-    sd = s.add("74xGxx:74AHCT1G125", "U", (190.5, 190.5), footprint=FP_SOT235, text="icright", fields={"MPN": "SN74AHCT1G125DBVR", **TI})
+    sd = s.add("74xGxx:74AHCT1G125", "U", (190.5, 220.98), footprint=FP_SOT235, text="icright", fields={"MPN": "SN74AHCT1G125DBVR", **TI})
     hier(s, sd, "2", "STIM_DRV", "input", stub=10.16)
     x, y = sd.pos("1")
     s.path((x, y), (x, y - 7.62), (x + 25.4, y - 7.62))
@@ -371,16 +403,14 @@ def build_control():
     x2, _ = rl.pos("2")
     s.wire(x2, ys, x2 + 30.48, ys)
     s.label("STIM", x2 + 30.48, ys, 0, kind="hier", shape="passive")
-    tp = s.add("Connector:TestPoint", "TP", (x2 + 7.62, ys), value="STIM", footprint=FP_TP, text="right")
-    tp.pin("1")
+    tap_tp(s, x2 + 7.62, ys, "STIM")
     # ADC dividers: STIM and VDD5
     for src_x, top_net, adc in ((x2 + 17.78, None, "ADC_STIM"), (x2 + 50.8, "VDD5", "ADC_VDD5")):
         if top_net:
             r1 = R(s, (src_x, ys + 3.81), "100k")
             s.connect(r1, "1", "VDD5", stub=0)
         else:
-            r1 = R(s, (src_x, ys + 3.81), "100k")
-            r1.pin("1")
+            r1 = r_down(s, src_x, ys, "100k")
         n = r1.pos("2")
         pull(s, n[0], n[1], "GND", "100k", up=False, text="left")
         s.wire(n[0], n[1], n[0] + 15.24, n[1])
@@ -413,17 +443,17 @@ def build_mcu():
     for net, pin, shape in MCU_HIER_R:
         if net:
             hier(s, u, pin, net, shape, stub=7.62)
-    for pin, net in MCU_LOCAL.items():
-        s.connect(u, pin, net)
+    for pin, net in MCU_LOCAL.items():          # long stubs: clear of the hierarchical labels on adjacent pins
+        s.connect(u, pin, net, stub=25.4)
     hier(s, u, "PA11", "USB_DM", "bidirectional", stub=7.62)
     hier(s, u, "PA12", "USB_DP", "bidirectional", stub=7.62)
     s.connect(u, "VSS", "GND")
     decap(s, u, "VDD", rail="+3V3", values=("100n", "100n", "4.7u"))
     x, y = u.pos("VREF+")
-    s.path((x, y), (x - 7.62, y), (x - 7.62, y - 10.16))
-    s.power("+3V3", x - 7.62, y - 10.16, 90)
-    s.wire(x - 7.62, y - 5.08, x - 17.78, y - 5.08)
-    cap_down(s, x - 17.78, y - 5.08, "100n", text="left")
+    s.path((x, y), (x - 7.62, y), (x - 7.62, y - 15.24))
+    s.power("+3V3", x - 7.62, y - 15.24, 90)
+    s.wire(x - 7.62, y - 12.7, x - 17.78, y - 12.7)
+    cap_down(s, x - 17.78, y - 12.7, "100n", text="left")
     # reset
     x, y = u.pos("PF2")
     s.wire(x, y, x - 25.4, y)
@@ -523,32 +553,27 @@ def build_power():
     # shield
     xs, ys = j.pos("SH")
     s.wire(xs, ys, xs, ys + 5.08)
-    s.wire(xs, ys + 5.08, xs - 7.62, ys + 5.08)
-    rsh = R(s, (xs, ys + 8.89), "1M", text="right")
-    rsh.pin("1")
+    s.wire(xs, ys + 5.08, xs - 12.7, ys + 5.08)
+    rsh = r_down(s, xs - 5.08, ys + 5.08, "1M", text="right")
     s.connect(rsh, "2", "GND")
-    csh = C(s, (xs - 7.62, ys + 8.89), "4.7n", text="left", fields={"Note": "≥ 100 V"})
-    csh.pin("1")
-    s.connect(csh, "2", "GND")
+    cap_down(s, xs - 12.7, ys + 5.08, "4.7n", text="left", fields={"Note": "≥ 100 V"})
     # VBUS → PTC → ideal diode → ferrite → VDD5
     yv = 78.74
     xv, yvb = j.pos("A4")
     s.path((xv, yvb), (xv + 7.62, yvb), (xv + 7.62, yv))
     s.power("VBUS", xv + 7.62, yv, 90)
-    fl = s.add("power:PWR_FLAG", "#FLG", (xv + 20.32, yv))
-    fl.pin("1")
+    tap_flag(s, xv + 20.32, yv)
     f = s.add("Device:Polyfuse", "F", (91.44, yv), rot=90, value="500mA", footprint="Fuse:Fuse_1206_3216Metric",
               fields={"MPN": "1206 PTC 500 mA hold, 6 V"})
     s.path((xv + 7.62, yv), f.pos("1"))
-    idd = s.add("Power_Management:LM66100DCK", "U", (134.62, yv + 2.54), text="icright",
+    idd = s.add("Power_Management:LM66100DCK", "U", (139.7, yv + 2.54), text="icright",
                 fields={"MPN": "LM66100DCKR"})
     s.path(f.pos("2"), idd.pos("VIN"))
     xf2 = f.pos("2")[0]
-    fl2 = s.add("power:PWR_FLAG", "#FLG", (xf2 + 6.35, yv))
-    fl2.pin("1")
+    tap_flag(s, xf2 + 6.35, yv)
     s.wire(xf2 + 16.51, yv, xf2 + 16.51, yv - 5.08)
     s.label("VBUS_F", xf2 + 16.51, yv - 5.08, 90)
-    cap_down(s, xf2 + 22.86, yv, "10u", fp=FP_C0805)
+    cap_down(s, xf2 + 22.86, yv, "10u", fp=FP_C0805, text="left")
     x, y = idd.pos("~{CE}")
     s.path((x, y), (x - 2.54, y), (x - 2.54, y + 7.62))
     s.power("GND", x - 2.54, y + 7.62, 270)
@@ -558,13 +583,11 @@ def build_power():
                footprint="Inductor_SMD:L_0603_1608Metric", fields={"Note": "≥ 1 A"})
     s.path(idd.pos("VOUT"), fb.pos("1"))
     xr0 = fb.pos("2")[0]
-    s.power("VDD5", xr0 + 12.7, yv, 90)
-    fl3 = s.add("power:PWR_FLAG", "#FLG", (xr0 + 20.32, yv))
-    fl3.pin("1")
+    tap_power(s, "VDD5", xr0 + 12.7, yv)
+    tap_flag(s, xr0 + 20.32, yv)
     for i, v in enumerate(["10u", "10u", "100n"]):
         cap_down(s, xr0 + 27.94 + 12.7 * i, yv, v, fp=FP_C0805 if v == "10u" else FP_C0603)
-    tp = s.add("Connector:TestPoint", "TP", (xr0 + 63.5, yv), value="VDD5", footprint=FP_TP, text="right")
-    tp.pin("1")
+    tap_tp(s, xr0 + 63.5, yv, "VDD5")
     # shunt clamp: PNP on VDD5, TL431 sets ~5.45 V
     q = s.add("Transistor_BJT:BCP53", "Q", (xr0 + 80.01, 93.98), rot=180, text="left",
               fields={"MPN": "BCP53-16", "Note": "shunt pass, ≥ 1 W"})
@@ -572,20 +595,18 @@ def build_power():
     s.wire(xe, ye, xe, yv)
     xc, yc = q.pos("2")
     s.path(q.pos("4"), (xc, q.pos("4")[1]))
-    rce = R(s, (xc, yc + 3.81), "4.7", fp=FP_R1206, text="left", fields={"Note": "collector ballast"})
-    rce.pin("1")
+    rce = r_down(s, xc, yc, "4.7", fp=FP_R1206, text="left", fields={"Note": "collector ballast"})
     s.connect(rce, "2", "GND")
     xb, yb = q.pos("B")
     XN = xb + 7.62
-    rbe = R(s, (XN, yv + 3.81), "10k")
-    rbe.pin("1")
+    rbe = r_down(s, XN, yv, "10k")
     s.path(rbe.pos("2"), (XN, yb), (xb, yb))
     s.label("CLAMP_B", XN, yb, 0)
     XT = XN + 12.7
     s.path((XN, yb), (XN, yb + 2.54), (XT, yb + 2.54))
     rbk = R(s, (XT, yb + 6.35), "470")
     rbk.pin("1")
-    tl = s.add("Reference_Voltage:TL431DBZ", "U", (XT, yb + 12.7), rot=90, fields={"MPN": "TL431BIDBZR"})
+    tl = s.add("Reference_Voltage:TL431DBZ", "U", (XT, yb + 15.24), rot=90, fields={"MPN": "TL431BIDBZR"})
     s.path(rbk.pos("2"), tl.pos("K"))
     s.connect(tl, "A", "GND")
     xref, yref = tl.pos("REF")
@@ -593,8 +614,7 @@ def build_power():
     YD = yref + 12.7
     s.path((xref, yref), (xref - 2.54, yref), (xref - 2.54, YD), (XD, YD))
     s.wire(xr0, yv, XD, yv)
-    rt = R(s, (XD, yv + 3.81), "11.8k", fields={"Note": "sets clamp ≈ 5.45 V"})
-    rt.pin("1")
+    rt = r_down(s, XD, yv, "11.8k", fields={"Note": "sets clamp ≈ 5.45 V"})
     s.path(rt.pos("2"), (XD, YD))
     pull(s, XD, YD, "GND", "10k", up=False)
     # 3.3 V LDO
@@ -610,10 +630,11 @@ def build_power():
     s.connect(ldo, "NC", None)
     xo, yo = ldo.pos("VOUT")
     s.wire(xo, yo, xo + 25.4, yo)
-    s.power("+3V3", xo + 7.62, yo, 90)
+    tap_power(s, "+3V3", xo + 7.62, yo)
     cap_down(s, xo + 15.24, yo, "1u")
-    tp2 = s.add("Connector:TestPoint", "TP", (xo + 25.4, yo), value="+3V3", footprint=FP_TP, text="right")
-    tp2.pin("1")
+    s.wire(xo + 25.4, yo, xo + 27.94, yo)
+    tp2 = s.add("Connector:TestPoint", "TP", (xo + 27.94, yo - U), value="+3V3", footprint=FP_TP, text="right")
+    s.path((xo + 27.94, yo), tp2.pos("1"))
     tp3 = s.add("Connector:TestPoint", "TP", (241.3, 190.5), value="GND", footprint=FP_TP, text="right")
     s.connect(tp3, "1", "GND")
     fg = s.add("power:PWR_FLAG", "#FLG", (63.5, 132.08))
@@ -654,13 +675,11 @@ def build():
         root.path((x, yc), (x, sb.pin(sp)[1]), sb.pin(sp)[:2])
     root.path(cs.pin("MOSI5")[:2], sa.pin("CTRL_IN")[:2])
     root.connect(cs, "SENSE_LAST", "SENSE_LAST")
-    root.connect(sa, "SENSE_IN", "GND")
-    root.connect(sa, "ID_A0", "GND")
+    root.connect(sa, "SENSE_IN", "GND", rotate=True, stub=5.08)   # sideways: dense pin column
+    root.connect(sa, "ID_A0", "GND", rotate=True, stub=5.08)
     root.connect(sb, "CTRL_IN", "CTRL_AB")
     root.connect(sb, "SENSE_IN", "SENSE_AB")
-    x, y = sb.pin("ID_A0")[:2]
-    root.wire(x, y, x - 5.08, y)
-    root.power("+3V3", x - 5.08, y, 90)
+    root.connect(sb, "ID_A0", "+3V3", rotate=True, stub=5.08)
     root.connect(sa, "CTRL_OUT", "CTRL_AB")
     root.connect(sa, "SENSE_OUT", "SENSE_AB")
     root.connect(sb, "CTRL_OUT", None)

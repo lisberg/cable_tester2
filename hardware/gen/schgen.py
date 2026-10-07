@@ -389,14 +389,12 @@ class Sheet:
             self.nc(x, y)
             return
         if net in self.POWER and kind is None:
+            # house style: every pin gets its own wire, power symbols sit at the end of it
+            x, y = self.stub(obj, pin, max(stub or 0, 2.54))
             if a in (0, 180) and not rotate:
-                # horizontal pin: short stub, then a normally oriented symbol (GND down, rails up)
-                x, y = self.stub(obj, pin, max(stub, 2.54))
-                self.power(net, x, y, 270 if net == "GND" else 90)
-                return
-            if stub and stub > 2.54:
-                x, y = self.stub(obj, pin, stub)
-            self.power(net, x, y, a)
+                self.power(net, x, y, 270 if net == "GND" else 90)   # GND hangs down, rails point up
+            else:
+                self.power(net, x, y, a)
             return
         dx = {0: stub, 180: -stub, 90: 0, 270: 0}[a]
         dy = {0: 0, 180: 0, 90: -stub, 270: stub}[a]
