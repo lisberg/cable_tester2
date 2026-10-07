@@ -7,6 +7,7 @@ The Proto40 schematics are **generated**. Edit `proto40.py`, then regenerate. Do
 |---|---|
 | `sexpr.py` | Minimal KiCad S‑expression reader/writer |
 | `schgen.py` | Generator core: library symbol import (incl. `extends` flattening), placement, labels and power symbols on pin ends, multi‑instance hierarchical sheets with per‑instance references, deterministic UUIDs |
+| `style.py` | House-style building blocks (decap, pull, tap_*, cap_down, r_down, hier, footprints). Use these in every new design |
 | `make_lib.py` | Builds `hardware/lib/cable_tester.kicad_sym` (VDD5 power symbol, TMUX1308) |
 | `proto40.py` | Proto40 design: root → Power, MCU, Control, SideA/SideB (`side.kicad_sch`) → G1…G6 (`group8.kicad_sch`) |
 | `check_proto40.py` | Design‑intent audit on the exported netlist (channel cells, chains, rails, straps, loopback). Finds parts by sheet path and follows pins, so it survives layout changes |
@@ -37,6 +38,9 @@ They encode the location: `<prefix><sheet base + n>`.
 | SideB/G1…G6 | 2100…2600 | |
 
 ## Style
+
+The full rule set and workflow are in `.claude/skills/kicad-schematics/SKILL.md`. Summary:
+
 
 The sheets are drawn the way an engineer would draw them:
 
