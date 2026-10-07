@@ -1,9 +1,13 @@
 ---
-name: kicad-schematics
-description: House style and workflow for creating or changing KiCad schematics in this repository (Proto40, bank card, controller, backplane, fixture adapters). Use whenever a schematic sheet is generated, edited, re-laid-out or reviewed, or a new board's schematic is started — the drawing rules, the generator to use, and the checks that must pass before committing.
+name: ecad-house-style
+description: Mandatory house style, workflow and checks for ALL ECAD / electronics CAD work. Use automatically, before doing anything else, whenever the task involves schematics, schematic capture, PCB layout, footprints, symbols, netlists, BOMs, ERC/DRC, fabrication outputs or hardware design files in any EDA tool (KiCad, Altium, OrCAD, Eagle, EasyEDA, generated or hand-made), including creating, editing, re-laying-out, reviewing or exporting them, and starting a new board.
 ---
 
-# KiCad schematics – house style and workflow
+# ECAD house style and workflow
+
+**Scope:** every ECAD task – schematics, PCB layout, libraries (symbols/footprints), netlists, BOMs and
+fabrication outputs, in any EDA tool. The drawing rules in §1 apply to every schematic, whatever tool
+draws it (KiCad, Altium, …). For PCB / library / output work, follow §4 together with the checks in §3.
 
 Schematics in this repo are **generated** from Python (`hardware/gen/`) and committed as KiCad 10 files.
 Never hand-edit a generated `.kicad_sch`; change the generator and regenerate. These rules came from the
@@ -106,7 +110,23 @@ pdftoppm -r 200 -png -f N -l N -x X -y Y -W 900 -H 600 /tmp/<board>.pdf /tmp/zoo
 If you find a problem by eye that the checker missed, **extend `layoutcheck.py`** so it is caught
 automatically next time, then fix the layout.
 
-## 4. Review checklist (before sending a schematic to the user)
+## 4. PCB layout, libraries and outputs
+
+- Boards start from `hardware/_template` (`scripts/new_board.sh`): JLCPCB 4-layer stack-up, design rules,
+  net classes (FIXTURE / STIM / POWER / SPI) and custom clearance rules. Don't loosen them per board without
+  recording why in `docs/decisions.md`.
+- Repeated channels: lay out one group, then replicate it with KiCad multichannel tools – never hand-copy.
+- Fixture-side protection (TVS, then series R) sits next to the connector. Keep FIXTURE nets ≥ 0.3 mm from
+  logic and ≥ 0.5 mm from SPI clocks (enforced by the `.kicad_dru` rules).
+- New symbols/footprints go into the project library (`hardware/gen/make_lib.py` for symbols,
+  `hardware/lib/cable_tester.pretty` for footprints), with MPN/Manufacturer/LCSC fields. Never embed
+  one-off parts in a design.
+- DRC (with schematic parity) must be clean before fabrication outputs. Outputs come from
+  `scripts/kicad_outputs.sh` / CI tags `hw/<board>/vX.Y`, never hand-exported.
+- In other EDA tools (e.g. Altium), apply the same rules. Where the automated checks can't run, do the
+  equivalent review manually and say so.
+
+## 5. Review checklist (before handing ECAD work to the user)
 
 - [ ] `--strict` layout check 0, ERC 0 (all severities), design-intent audit PASS, regeneration deterministic
 - [ ] Every block wired; labels only where a net leaves its block

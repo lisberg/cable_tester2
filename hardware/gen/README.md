@@ -39,7 +39,7 @@ They encode the location: `<prefix><sheet base + n>`.
 
 ## Style
 
-The full rule set and workflow are in `.claude/skills/kicad-schematics/SKILL.md`. Summary:
+The full rule set and workflow are in `.claude/skills/ecad-house-style/SKILL.md`. Summary:
 
 
 The sheets are drawn the way an engineer would draw them:

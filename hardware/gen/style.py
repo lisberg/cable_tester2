@@ -1,4 +1,4 @@
-"""House-style building blocks for generated schematics (see .claude/skills/kicad-schematics/SKILL.md).
+"""House-style building blocks for generated schematics (see .claude/skills/ecad-house-style/SKILL.md).
 
 Every helper obeys the drawing rules enforced by layoutcheck.py:
   * every pin leaves through its own short wire (no part directly on a wire, pin or power symbol),
