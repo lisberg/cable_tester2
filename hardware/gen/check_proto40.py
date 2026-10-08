@@ -49,6 +49,15 @@ def net(ref, pin):
     return pin_net.get((ref, pin), f"<unconnected {ref}.{pin}>")
 
 
+def through_r(name):
+    """Net on the far side of the single resistor on net `name` (series element)."""
+    rs = [(r, p) for r, p in nets[name] if comps[r]["part"] == "R"]
+    if len(rs) != 1:
+        return f"<{len(rs)} resistors on {name}>"
+    r, p = rs[0]
+    return net(r, "2" if p == "1" else "1")
+
+
 def one(part, path):
     p = parts(part, path)
     check(len(p) == 1, f"expected one {part} in {path}, got {p}")
@@ -74,8 +83,20 @@ for side in ("SideA", "SideB"):
         check(net(j, pin) == "GND", f"{side} {j}.{pin} not GND")
     k = kinds(net(j, "a28"))
     check(k == {"DIN41612_02x32_AC": 1, "D_TVS": 1, "R": 1}, f"{side} SHELL: {dict(k)}")
-    check(net(j, "c30") == ("GND" if side == "SideA" else "+3V3"), f"{side} ID_A0 strap wrong: {net(j, 'c30')}")
-    check(kinds(net(j, "c28")).get("R") == 1, f"{side} PRESENT_N has no pull-up")
+    # fixture ID lines: ESD diode + series R between the connector and the logic (D14)
+    for pin in ("a29", "a30", "c28", "c29", "c30"):
+        k = kinds(net(j, pin))
+        check(k == {"DIN41612_02x32_AC": 1, "D_TVS": 1, "R": 1}, f"{side} {j}.{pin} ID line protection: {dict(k)}")
+    k = kinds(net(j, "a31"))
+    check(k == {"DIN41612_02x32_AC": 1, "D_TVS": 1, "R": 1, "C": 1}, f"{side} ID_VCC: {dict(k)}")
+    check(through_r(net(j, "a31")) == "+3V3", f"{side} ID_VCC not fed from +3V3")
+    strap = through_r(net(j, "c30"))
+    check(strap == ("GND" if side == "SideA" else "+3V3"), f"{side} ID_A0 strap wrong: {strap}")
+    present = through_r(net(j, "c28"))
+    check(present in nets and kinds(present).get("R") == 2, f"{side} PRESENT_N has no pull-up")
+    for pin in ("a29", "a30", "c29", "c28"):
+        far = through_r(net(j, pin))
+        check(far in nets and "STM32C071C8Tx" in kinds(far), f"{side} {j}.{pin} does not reach the MCU")
     # 2. bias rail: 48 Rbias + driver + test point
     drv = one("74AHCT1G125", sp)
     k = kinds(net(drv, "4"))
@@ -95,6 +116,10 @@ for side in ("SideA", "SideB"):
     for a, b in zip(srs, srs[1:]):
         check(net(a, "9") == net(b, "10"), f"{side} chain break {a}.Q7 -> {b}.DS")
     s595 = one("74HC595", sp)
+    for pin in ("15", "1", "2", "3", "4", "5", "6", "7", "14", "9"):       # QA..QH, SER, QH'
+        check("TestPoint" in kinds(net(s595, pin)), f"{side} {s595}.{pin} has no test point")
+    check("TestPoint" in kinds(net(srs[0], "10")) and "TestPoint" in kinds(net(srs[-1], "9")),
+          f"{side} sense chain in/out without test point")
     for r in srs:
         check(net(r, "2") == net(s595, "11"), f"{r} CP not on SCK5")
         check(net(r, "1") == net(srs[0], "1"), f"{r} PL not shared")
@@ -116,8 +141,9 @@ loop = [nm for nm, nodes in nets.items() if kinds(nm) == {"D_TVS": 2, "R": 2}
         and {comps[r]["path"][:7] for r, _ in nodes} == {"/SideA/", "/SideB/"}]
 check(len(loop) == 1, f"LOOP between sides: {loop}")
 ja, jb = parts("DIN41612_02x32_AC", "/SideA/")[0], parts("DIN41612_02x32_AC", "/SideB/")[0]
-check(net(ja, "a29") == net(jb, "a29"), "ID_SDA not shared")
-check(net(ja, "c29") != net(jb, "c29"), "ID_WP must be per side")
+check(through_r(net(ja, "a29")) == through_r(net(jb, "a29")), "ID_SDA not shared")
+check(through_r(net(ja, "a30")) == through_r(net(jb, "a30")), "ID_SCL not shared")
+check(through_r(net(ja, "c29")) != through_r(net(jb, "c29")), "ID_WP must be per side")
 # 6. power
 for r, c in comps.items():
     if c["part"] in ("TMUX1308", "74HC165", "74HC595"):

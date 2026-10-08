@@ -7,11 +7,11 @@ The Proto40 schematics are **generated**. Edit `proto40.py`, then regenerate. Do
 |---|---|
 | `sexpr.py` | Minimal KiCad S‑expression reader/writer |
 | `schgen.py` | Generator core: library symbol import (incl. `extends` flattening), placement, labels and power symbols on pin ends, multi‑instance hierarchical sheets with per‑instance references, deterministic UUIDs |
-| `style.py` | House-style building blocks (decap, pull, tap_*, cap_down, r_down, hier, footprints). Use these in every new design |
+| `style.py` | House-style building blocks (decap, pull, tap_*, cap_down, r_down, hier, footprints) and default passive part numbers (Yageo RC / Samsung CL). Use these in every new design |
 | `make_lib.py` | Builds `hardware/lib/cable_tester.kicad_sym` (VDD5 power symbol, TMUX1308) |
 | `proto40.py` | Proto40 design: root → Power, MCU, Control, SideA/SideB (`side.kicad_sch`) → G1…G6 (`group8.kicad_sch`) |
 | `check_proto40.py` | Design‑intent audit on the exported netlist (channel cells, chains, rails, straps, loopback). Finds parts by sheet path and follows pins, so it survives layout changes |
-| `layoutcheck.py` | Readability check: text/text, text/body, text/wire overlaps and wires through symbol bodies. `proto40.py --strict` fails on any issue (CI uses it) |
+| `layoutcheck.py` | Readability check: text/text (with a 0.5 mm gap), text/body, text/wire overlaps, text running along a foreign wire closer than 0.75 mm, wires through symbol bodies, pins without their own wire, no-connect flags on wired pins, non-ASCII visible text and title-block overflow. `proto40.py --strict` fails on any issue (CI uses it) |
 
 ## Regenerate and check
 
@@ -61,3 +61,6 @@ The sheets are drawn the way an engineer would draw them:
   They get longer stubs, or the power tie is drawn sideways.
 
 Junctions are added automatically wherever three connections meet or a wire/pin ends on a wire.
+
+Sourcing fields: every placed part gets `MPN`/`Manufacturer` (from the call, the passive defaults in `style.py`, or the
+library symbol) and an `LCSC` field, `TBD` until the JLCPCB BOM pass fills it in. Open selections say `TBD: ...`.

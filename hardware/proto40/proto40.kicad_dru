@@ -2,9 +2,9 @@
 
 # Cable tester custom design rules (JLCPCB 4-layer, conservative / no-surcharge class).
 # Net classes are assigned by pattern in the project file:
-#   FIXTURE = *EXT*, *SHELL*   (connector-side nodes, before the series resistor; up to ±30 V)
-#   STIM    = *STIM*           (global stimulus / ADC bus)
-#   POWER   = rails, SPI = shift-chain clocks/data
+#   FIXTURE = *EXT*, *SHELL*   (connector-side nodes and fixture ID lines, before the series resistor; up to ±30 V)
+#   STIM    = */STIM, */MUX*   (global stimulus / ADC bus and the mux outputs feeding it)
+#   POWER   = rails, SPI = shift-chain clocks/data (*SCK*, *MOSI*, *MISO*, */RCLK*, */PL_N, */PL5_N)
 
 (rule "Fixture nets keep away from logic"
 	(condition "A.NetClass == 'FIXTURE' && B.NetClass != 'FIXTURE' && B.Type != 'Zone'")

@@ -381,7 +381,11 @@
       },
       {
         "netclass": "STIM",
-        "pattern": "*STIM*"
+        "pattern": "*/STIM"
+      },
+      {
+        "netclass": "STIM",
+        "pattern": "*/MUX*"
       },
       {
         "netclass": "POWER",
@@ -410,6 +414,18 @@
       {
         "netclass": "SPI",
         "pattern": "*MISO*"
+      },
+      {
+        "netclass": "SPI",
+        "pattern": "*/RCLK*"
+      },
+      {
+        "netclass": "SPI",
+        "pattern": "*/PL_N"
+      },
+      {
+        "netclass": "SPI",
+        "pattern": "*/PL5_N"
       }
     ]
   },

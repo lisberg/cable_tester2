@@ -34,7 +34,10 @@ Totals: 50 nodes + 1 shell + 6 ID/control + 7 GND = 64.
   EXT41–EXT50 are left unconnected on the base, so the pinout stays identical to Rev A.
 * EEPROM address: adapter ties A1 = A2 = GND and takes A0 from `ID_A0`. The same adapter design therefore
   works on either side.
-* `ID_VCC` is fed through ≥ 47 Ω + polyfuse (or a load switch) on the base, so a damaged adapter cannot
-  pull down the controller's 3.3 V rail.
+* `ID_VCC` is fed through a current limit on the base that survives a dead short indefinitely, so a damaged
+  adapter cannot pull down the controller's 3.3 V rail: ≥ 47 Ω rated for the short, or ≥ 47 Ω + polyfuse, or a
+  load switch. Proto40: 100 Ω 1206 (33 mA, 0.11 W into a short; ≥ 3.0 V at the EEPROM's 3 mA write current).
+* On the base, every ID line (ID_SDA, ID_SCL, ID_WP, ID_A0, PRESENT_N, ID_VCC) has an ESD diode at the
+  connector, then a series resistor (220 Ω on I²C, 1 kΩ on the others) before any logic pin (D14).
 * Fixture nodes are rated ±24 V (design 30 V, see review F9). ID and control pins are **not**. Adapter layout
   must keep DUT‑side copper ≥ 0.3 mm from ID nets (FIXTURE net‑class rule in the template).

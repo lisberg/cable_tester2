@@ -11,7 +11,7 @@ for pro in hardware/*/*.kicad_pro; do
   dir=$(dirname "$pro"); name=$(basename "$pro" .kicad_pro)
   echo "=== $dir/$name"
   if [ -f "$dir/$name.kicad_sch" ]; then
-    kicad-cli sch erc --exit-code-violations --severity-error \
+    kicad-cli sch erc --exit-code-violations --severity-all \
       -o "$OUT/$name.erc.rpt" "$dir/$name.kicad_sch" || { echo "ERC FAILED: $name"; fail=1; }
   fi
   stage=$(cat "$dir/CI_STAGE" 2>/dev/null || echo layout)

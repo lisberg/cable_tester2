@@ -5,9 +5,12 @@ font (character advance ≈ 0.8 × size), which is close enough to catch real co
 """
 from schgen import Sym
 
-CHAR = 0.8          # advance per character, × font size
+CHAR = 1.0          # advance per character, × font size (KiCad 10 PDF: 1.15-1.33 mm per character at 1.27)
 SIZE = 1.27
 EPS = 0.25          # tolerance: touching is fine
+CLEAR = 0.75        # minimum gap between text and a wire it does not belong to (reads as touching below this)
+TEXT_GAP = 0.5      # minimum gap between two texts
+TITLE_MAX = 66      # title-block title field: ~1.45 mm per character, ~107 mm wide incl. "Title: "
 
 
 def _text_box(text, x, y, justify, size=SIZE, angle=0):
@@ -97,6 +100,10 @@ def boxes(sheet, ref_len=5):
                                              float(at[2]) + len(lines) * SIZE * 1.6)))
     for sh in sheet.sheets:
         out.append(("body", sh.name, (sh.x, sh.y, sh.x + sh.w, sh.y + sh.h)))
+        h = SIZE * 1.3
+        out.append(("sheettext", sh.name, (sh.x, sh.y - 0.7 - h, sh.x + len(sh.name) * CHAR * SIZE, sh.y - 0.7)))
+        fn = f"File: {sh.child.filename}"
+        out.append(("sheettext", fn, (sh.x, sh.y + sh.h + 0.7, sh.x + len(fn) * CHAR * SIZE, sh.y + sh.h + 0.7 + h)))
         for pname, (x, y, a, _) in sh.pins.items():
             w = len(pname) * CHAR * SIZE
             box = (x + 1.0, y - SIZE / 2, x + 1.0 + w, y + SIZE / 2) if a == 180 else \
@@ -105,15 +112,42 @@ def boxes(sheet, ref_len=5):
     return out
 
 
+def _gap(box, seg):
+    """Distance between an axis-aligned box and a horizontal/vertical segment (0 if they touch)."""
+    x1, y1, x2, y2 = seg
+    dx = max(box[0] - max(x1, x2), min(x1, x2) - box[2], 0)
+    dy = max(box[1] - max(y1, y2), min(y1, y2) - box[3], 0)
+    return (dx * dx + dy * dy) ** 0.5
+
+
+def _visible_texts(sheet):
+    out = [("title", sheet.title)]
+    for s in sheet.syms:
+        if s.value:
+            out.append((f"{s.prefix}{s.idx} value", s.value))
+    for it in sheet.items:
+        if it[0] in ("label", "global_label", "hierarchical_label", "text"):
+            out.append((it[0], it[1]))
+    for sh in sheet.sheets:
+        out += [("sheet", sh.name)] + [("sheet pin", p) for p in sh.pins]
+    return out
+
+
 def check(sheet):
     items = boxes(sheet)
     issues = []
-    texts = [b for b in items if b[0] in ("ref", "value", "label", "note")]
+    # visible text is ASCII-only: the KiCad stroke font has no arrows, dashes, Ohm, <= ...
+    for what, t in _visible_texts(sheet):
+        if any(ord(ch) > 126 for ch in t):
+            issues.append(f"non-ASCII: {what} {t!r}")
+    if len(sheet.title) > TITLE_MAX:
+        issues.append(f"title: {len(sheet.title)} characters overflow the title block (max {TITLE_MAX})")
+    texts = [b for b in items if b[0] in ("ref", "value", "label", "note", "sheettext")]
     bodies = [b for b in items if b[0] == "body"]
     # text vs text
     for i, a in enumerate(texts):
         for b in texts[i + 1:]:
-            if _overlap(a[2], b[2]):
+            if _overlap(a[2], b[2], eps=-TEXT_GAP):          # neighbouring texts must not run together
                 issues.append(f"text/text: {a[0]} {a[1]!r} × {b[0]} {b[1]!r}")
     # text vs bodies
     for t in texts:
@@ -131,6 +165,38 @@ def check(sheet):
         for owner, seg in pin_lines:
             if _seg_hits_box(seg, t[2]):
                 issues.append(f"text/pin: {t[0]} {t[1]!r} × pin line of {owner} {seg}")
+    # text running along a wire it does not belong to, too close to read as separate (e.g. a label under a
+    # wire that continues over it one row up, a GND symbol's text against the next row's wire). Wires that
+    # touch the text's own anchor / symbol pins are skipped, and so is mere corner proximity: the wire must
+    # run alongside the text for at least 1 mm.
+    def rp(x, y):
+        return round(x, 2), round(y, 2)
+
+    anchors = {}
+    for sym in sheet.syms:
+        anchors[f"{sym.prefix}{sym.idx}"] = {rp(*sym.pin(p.number, mark=False)[:2]) for p in sym.all_pins()}
+    for it in sheet.items:
+        if it[0] in ("label", "global_label", "hierarchical_label"):
+            at = [e for e in it if isinstance(e, list) and e[0] == "at"][0]
+            anchors.setdefault(it[1], set()).add(rp(float(at[1]), float(at[2])))
+    for t in texts:
+        if t[0] in ("note", "sheettext"):
+            continue
+        own = anchors.get(t[1].split(":")[0], set())
+        box = t[2]
+        for seg in sheet.segs:
+            a, b = rp(seg[0], seg[1]), rp(seg[2], seg[3])
+            if a in own or b in own:
+                continue
+            if any((a[0] == x == b[0] and min(a[1], b[1]) <= y <= max(a[1], b[1])) or
+                   (a[1] == y == b[1] and min(a[0], b[0]) <= x <= max(a[0], b[0])) for x, y in own):
+                continue                                    # the wire runs through the anchor (label mid-wire)
+            if a[1] == b[1]:
+                along = min(max(a[0], b[0]), box[2]) - max(min(a[0], b[0]), box[0])
+            else:
+                along = min(max(a[1], b[1]), box[3]) - max(min(a[1], b[1]), box[1])
+            if along >= 1.0 and _gap(box, seg) < CLEAR and not _seg_hits_box(seg, box):
+                issues.append(f"text/wire clearance: {t[0]} {t[1]!r} {_gap(box, seg):.2f} mm from wire {seg}")
     # wires through bodies (pins end on the body edge, so shrink the box); a wire that starts on one of
     # the symbol's own pins leaves outward by construction and is not a crossing
     own_pins = {}
@@ -166,6 +232,8 @@ def check(sheet):
                 continue
             pt = sym.pin(p.number, mark=False)[:2]
             if pt in ncs:
+                if ends.get(pt) or owner.get(pt, set()) - {name}:
+                    issues.append(f"pin/nc: {name}.{p.number} has a no-connect flag but is wired")
                 continue
             others = owner.get(pt, set()) - {name}
             if others:
