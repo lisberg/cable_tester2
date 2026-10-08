@@ -13,6 +13,7 @@ U = 2.54
 # ------------------------------------------------------------------------------------------- footprints / helpers
 FP_R0603 = "Resistor_SMD:R_0603_1608Metric"
 FP_R1206 = "Resistor_SMD:R_1206_3216Metric"
+FP_R2512 = "Resistor_SMD:R_2512_6332Metric"
 FP_C0603 = "Capacitor_SMD:C_0603_1608Metric"
 FP_C0805 = "Capacitor_SMD:C_0805_2012Metric"
 FP_TSSOP16 = "Package_SO:TSSOP-16_4.4x5mm_P0.65mm"
@@ -20,14 +21,47 @@ FP_TSSOP14 = "Package_SO:TSSOP-14_4.4x5mm_P0.65mm"
 FP_SOT235 = "Package_TO_SOT_SMD:SOT-23-5"
 FP_TP = "TestPoint:TestPoint_Pad_D1.0mm"
 TI = {"Manufacturer": "Texas Instruments"}
+NO_PART = {"MPN": "none (PCB pad only)", "LCSC": "none"}
+
+# Default passive part numbers: Yageo RC thick film 1 % and Samsung MLCC. Generic house picks; confirm stock
+# and the LCSC number at the JLCPCB BOM pass.
+_R_SIZE = {FP_R0603: ("0603", "FR"), FP_R1206: ("1206", "FR"), FP_R2512: ("2512", "FK")}
+_C_MPN = {("100p", FP_C0603): "CL10C101JB8NNNC",    # C0G 50 V
+          ("1n", FP_C0603): "CL10B102KB8NNNC",      # X7R 50 V
+          ("4.7n", FP_C0603): "CL10B472KC8NNNC",    # X7R 100 V
+          ("100n", FP_C0603): "CL10B104KB8NNNC",    # X7R 50 V
+          ("1u", FP_C0603): "CL10A105KB8NNNC",      # X5R 50 V
+          ("4.7u", FP_C0805): "CL21A475KAQNNNE",    # X5R 25 V
+          ("10u", FP_C0805): "CL21A106KAYNNNE"}     # X5R 25 V
 
 
-def R(s, at, value, rot=0, fp=FP_R0603, **kw):
-    return s.add("Device:R", "R", at, rot=rot, value=value, footprint=fp, **kw)
+def r_code(value):
+    """'4.7k' -> '4K7', '10k' -> '10K', '47' -> '47R', '6.8' -> '6R8' (Yageo value code)."""
+    mult = value[-1].upper() if value[-1] in "kKM" else "R"
+    num = value[:-1] if mult != "R" else value
+    return num.replace(".", mult) if "." in num else num + mult
 
 
-def C(s, at, value="100n", rot=0, fp=FP_C0603, **kw):
-    return s.add("Device:C", "C", at, rot=rot, value=value, footprint=fp, **kw)
+def r_mpn(value, fp):
+    size, tol = _R_SIZE[fp]
+    return f"RC{size}{tol}-07{r_code(value)}L"
+
+
+def _parts(fields, mpn, mfr):
+    fields = dict(fields or {})
+    if mpn and "MPN" not in fields:
+        fields = {"MPN": mpn, "Manufacturer": mfr, **fields}
+    return fields
+
+
+def R(s, at, value, rot=0, fp=FP_R0603, fields=None, **kw):
+    return s.add("Device:R", "R", at, rot=rot, value=value, footprint=fp,
+                 fields=_parts(fields, r_mpn(value, fp), "Yageo"), **kw)
+
+
+def C(s, at, value="100n", rot=0, fp=FP_C0603, fields=None, **kw):
+    return s.add("Device:C", "C", at, rot=rot, value=value, footprint=fp,
+                 fields=_parts(fields, _C_MPN.get((value, fp)), "Samsung Electro-Mechanics"), **kw)
 
 
 def hier(s, obj, pin, net, shape="passive", stub=5.08):
@@ -72,7 +106,7 @@ def pull(s, x, y, rail, value, up=True, text="auto", **kw):
 
 def tap_tp(s, x, y, value):
     """Test point above a wire point, on its own short wire."""
-    tp = s.add("Connector:TestPoint", "TP", (x, y - U), value=value, footprint=FP_TP, text="right")
+    tp = s.add("Connector:TestPoint", "TP", (x, y - U), value=value, footprint=FP_TP, text="right", fields=NO_PART)
     s.path((x, y), tp.pos("1"))
     return tp
 
